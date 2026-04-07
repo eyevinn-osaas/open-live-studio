@@ -1,7 +1,21 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
-import { MOCK_SOURCES, type Source, type SourceStatus } from '@/mock/sources'
+
+export type SourceType = 'Camera' | 'SRT' | 'NDI' | 'Test'
+export type SourceStatus = 'connected' | 'connecting' | 'disconnected'
+export type Resolution = '3840x2160' | '1920x1080' | '1280x720'
+
+export interface Source {
+  id: string
+  name: string
+  type: SourceType
+  status: SourceStatus
+  resolution: Resolution
+  lastSeenAt: number
+  color: string
+  liveCamera?: boolean
+}
 
 interface SourcesState {
   sources: Source[]
@@ -20,20 +34,13 @@ interface SourcesActions {
 export const useSourcesStore = create<SourcesState & SourcesActions>()(
   devtools(
     immer((set) => ({
-      sources: MOCK_SOURCES.map((s) => ({ ...s })),
+      sources: [],
       lastFetchedAt: Date.now(),
       isLoading: false,
 
       refresh: () =>
         set((state) => {
           state.isLoading = true
-          // Simulate async fetch — resolve immediately with mock data
-          setTimeout(() => {
-            useSourcesStore.setState((s) => {
-              s.isLoading = false
-              s.lastFetchedAt = Date.now()
-            })
-          }, 400)
         }),
 
       addSource: (source) =>

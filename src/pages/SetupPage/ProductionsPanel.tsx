@@ -1,13 +1,20 @@
 import { useState } from 'react'
 import { useProductionStore } from '@/store/production.store'
 import { useSourcesStore } from '@/store/sources.store'
-import { MOCK_PRODUCTIONS, type Production } from '@/mock/productions'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 
+interface Production {
+  id: string
+  name: string
+  sourceIds: string[]
+  createdAt: string
+  isActive: boolean
+}
+
 export function ProductionsPanel() {
-  const [productions, setProductions] = useState<Production[]>(MOCK_PRODUCTIONS)
+  const [productions, setProductions] = useState<Production[]>([])
   const { activeProductionId, setActiveProduction } = useProductionStore()
   const sources = useSourcesStore((s) => s.sources)
   const [newName, setNewName] = useState('')

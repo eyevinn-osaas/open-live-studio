@@ -3,7 +3,7 @@ import { VideoTile } from '@/components/ui/VideoTile'
 import { TallyLight } from '@/components/ui/TallyLight'
 import { useTallyLight } from '@/hooks/useTallyLight'
 import { getSourceStream } from '@/lib/webrtc'
-import type { Source } from '@/mock/sources'
+import type { Source } from '@/store/sources.store'
 
 interface MultiviewCellProps {
   source: Source

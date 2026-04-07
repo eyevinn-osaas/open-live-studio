@@ -4,7 +4,7 @@ import { useSourcesStore } from '@/store/sources.store'
 import { VideoTile } from '@/components/ui/VideoTile'
 import { Badge } from '@/components/ui/Badge'
 import { getSourceStream } from '@/lib/webrtc'
-import type { Source } from '@/mock/sources'
+import type { Source } from '@/store/sources.store'
 import type { TallyState } from '@/hooks/useTallyLight'
 
 function SourceMonitor({ source, tally }: { source: Source | undefined; tally: TallyState }) {

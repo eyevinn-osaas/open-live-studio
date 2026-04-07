@@ -30,13 +30,13 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
   devtools(
     immer((set) => ({
       // State
-      pgmSourceId: 'src-1',
-      pvwSourceId: 'src-2',
+      pgmSourceId: null,
+      pvwSourceId: null,
       isLive: false,
       transitionType: 'cut',
       transitionDurationMs: 500,
       tBarPosition: 0,
-      activeProductionId: 'prod-1',
+      activeProductionId: null,
 
       // Actions
       cut: () =>

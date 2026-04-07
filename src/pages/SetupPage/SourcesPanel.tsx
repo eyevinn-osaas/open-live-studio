@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { StatusDot } from '@/components/ui/StatusDot'
 import { Modal } from '@/components/ui/Modal'
-import type { Source, SourceType, Resolution } from '@/mock/sources'
+import type { Source, SourceType, Resolution } from '@/store/sources.store'
 
 const SOURCE_COLORS: Record<string, string> = {
   Camera: 'text-blue-400', SRT: 'text-orange-400', NDI: 'text-teal-400', Test: 'text-zinc-400',

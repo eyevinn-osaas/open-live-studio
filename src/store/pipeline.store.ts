@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
-import { MOCK_STROM_PIPELINE_JSON } from '@/mock/pipeline'
 
 export type ExecutionState = 'idle' | 'running' | 'error' | 'stalled'
 
@@ -22,9 +21,9 @@ interface PipelineActions {
 export const usePipelineStore = create<PipelineState & PipelineActions>()(
   devtools(
     immer((set) => ({
-      stromJson: MOCK_STROM_PIPELINE_JSON,
+      stromJson: '',
       parseError: null,
-      executionState: 'running',
+      executionState: 'idle',
       uptimeSeconds: 0,
 
       setStromJson: (json) =>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useGraphicsStore } from '@/store/graphics.store'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
-import type { GraphicOverlay } from '@/mock/graphics'
+import type { GraphicOverlay } from '@/store/graphics.store'
 
 function OverlayCard({ overlay }: { overlay: GraphicOverlay }) {
   const { toggleOverlay, updateField, activeOverlayIds } = useGraphicsStore()

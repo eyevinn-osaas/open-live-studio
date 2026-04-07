@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import { MOCK_INTERCOM_LINES, type IntercomLine } from '@/mock/intercom-lines'
+
+export interface IntercomLine {
+  id: string
+  name: string
+  color: string
+  description: string
+}
 
 interface IntercomState {
   lines: IntercomLine[]
@@ -26,7 +32,7 @@ interface IntercomActions {
 export const useIntercomStore = create<IntercomState & IntercomActions>()(
   devtools(
     (set, get) => ({
-      lines: MOCK_INTERCOM_LINES,
+      lines: [],
       joinedLineIds: [],
       micActive: false,
       micMuted: false,

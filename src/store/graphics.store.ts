@@ -1,7 +1,15 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
-import { MOCK_GRAPHIC_OVERLAYS, type GraphicOverlay } from '@/mock/graphics'
+
+export type OverlayType = 'lower-third' | 'full-screen' | 'bug'
+
+export interface GraphicOverlay {
+  id: string
+  name: string
+  type: OverlayType
+  fields: Record<string, string>
+}
 
 interface GraphicsState {
   overlays: GraphicOverlay[]
@@ -17,7 +25,7 @@ interface GraphicsActions {
 export const useGraphicsStore = create<GraphicsState & GraphicsActions>()(
   devtools(
     immer((set, get) => ({
-      overlays: MOCK_GRAPHIC_OVERLAYS.map((o) => ({ ...o, fields: { ...o.fields } })),
+      overlays: [],
       activeOverlayIds: [],
 
       toggleOverlay: (id) =>

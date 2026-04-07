@@ -1,7 +1,7 @@
 import { useIntercomStore } from '@/store/intercom.store'
 import { Button } from '@/components/ui/Button'
 import { AudioMeter } from './AudioMeter'
-import type { IntercomLine as IntercomLineType } from '@/mock/intercom-lines'
+import type { IntercomLine as IntercomLineType } from '@/store/intercom.store'
 
 interface IntercomLineProps {
   line: IntercomLineType

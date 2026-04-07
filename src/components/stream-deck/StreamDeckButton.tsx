@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn'
-import type { StreamDeckButton as StreamDeckButtonType } from '@/mock/stream-deck-layout'
+import type { StreamDeckButton as StreamDeckButtonType } from '@/store/stream-deck.store'
 
 interface StreamDeckButtonProps {
   button: StreamDeckButtonType

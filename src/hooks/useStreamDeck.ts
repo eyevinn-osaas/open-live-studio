@@ -4,7 +4,7 @@ import { KeyedDebounce } from '@/lib/debounce'
 import { useStreamDeckStore } from '@/store/stream-deck.store'
 import { useProductionStore } from '@/store/production.store'
 import { useGraphicsStore } from '@/store/graphics.store'
-import type { ButtonAction } from '@/mock/stream-deck-layout'
+import type { ButtonAction } from '@/store/stream-deck.store'
 
 const debounce = new KeyedDebounce()
 

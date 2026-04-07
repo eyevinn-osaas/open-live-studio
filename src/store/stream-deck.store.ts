@@ -1,6 +1,22 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import { MOCK_STREAM_DECK_LAYOUT, type StreamDeckButton } from '@/mock/stream-deck-layout'
+
+export type ButtonAction =
+  | { type: 'pvw'; sourceId: string }
+  | { type: 'cut' }
+  | { type: 'take' }
+  | { type: 'go-live' }
+  | { type: 'graphic-toggle'; graphicId: string }
+  | { type: 'transition'; mode: 'cut' | 'mix' | 'wipe' }
+  | { type: 'none' }
+
+export interface StreamDeckButton {
+  index: number
+  label: string
+  sublabel?: string
+  action: ButtonAction
+  color: string
+}
 
 interface StreamDeckState {
   device: HIDDevice | null
@@ -24,7 +40,7 @@ export const useStreamDeckStore = create<StreamDeckState & StreamDeckActions>()(
       device: null,
       isConnected: false,
       isSupported: false,
-      buttonMap: MOCK_STREAM_DECK_LAYOUT,
+      buttonMap: [],
       lastPressedIndex: null,
 
       setDevice: (device) => set({ device, isConnected: device !== null }),

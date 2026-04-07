@@ -2,7 +2,7 @@ import { StreamDeckButton } from './StreamDeckButton'
 import { useStreamDeckStore } from '@/store/stream-deck.store'
 import { useProductionStore } from '@/store/production.store'
 import { useGraphicsStore } from '@/store/graphics.store'
-import type { ButtonAction } from '@/mock/stream-deck-layout'
+import type { ButtonAction } from '@/store/stream-deck.store'
 
 function isButtonActive(action: ButtonAction, pgmSourceId: string | null, pvwSourceId: string | null, activeOverlayIds: string[]): boolean {
   switch (action.type) {
