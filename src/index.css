@@ -1,20 +1,31 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
 
 @theme {
+  /* Broadcast tally */
   --color-pgm: #dc2626;
   --color-pvw: #16a34a;
   --color-tally-off: #3d3d3d;
   --color-live: #ef4444;
+
+  /* Brand — matches intercom cyan */
   --color-accent: #59cbe8;
+  --color-accent-hover: rgba(89, 203, 232, 0.85);
 
-  --color-surface-1: #1a1a1a;
+  /* Surfaces — intercom palette */
+  --color-surface-1: #1e1e1e;
   --color-surface-2: #242424;
-  --color-surface-3: #32383b;
-  --color-border: #434343;
+  --color-surface-3: rgba(50, 56, 59, 0.4);
+  --color-surface-raised: #32383b;
 
+  /* Borders */
+  --color-border: rgba(109, 109, 109, 0.3);
+  --color-border-strong: #6d6d6d;
+
+  /* Text */
   --color-text-primary: rgba(255, 255, 255, 0.87);
   --color-text-muted: rgba(255, 255, 255, 0.5);
+  --color-text-dark: #1a1a1a;
 
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 }
@@ -33,25 +44,20 @@ body,
   color: var(--color-text-primary);
   font-family: Inter, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 /* Tally ring utilities */
-.ring-pgm {
-  --tw-ring-color: var(--color-pgm);
-}
-.ring-pvw {
-  --tw-ring-color: var(--color-pvw);
+.ring-pgm { --tw-ring-color: var(--color-pgm); }
+.ring-pvw  { --tw-ring-color: var(--color-pvw); }
+
+/* Range inputs */
+input[type="range"] {
+  accent-color: var(--color-accent);
 }
 
 /* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--color-surface-2);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-surface-2); }
+::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }

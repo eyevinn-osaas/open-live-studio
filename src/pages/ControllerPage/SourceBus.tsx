@@ -31,32 +31,33 @@ function SourceCell({ sourceId }: { sourceId: string }) {
     <VideoTile
       stream={stream}
       label={source.name}
-      sublabel={source.type}
+      sublabel={source.address}
       tally={tally}
       onClick={() => setPvw(sourceId)}
-      onDoubleClick={() => {
-        setPvw(sourceId)
-        cut()
-      }}
+      onDoubleClick={() => { setPvw(sourceId); cut() }}
       className="min-w-[140px]"
     />
   )
 }
 
 export function SourceBus() {
-  const sources = useSourcesStore(useShallow((s) => s.sources.filter((s) => s.status !== 'disconnected')))
+  const sources = useSourcesStore(useShallow((s) => s.sources))
 
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[--color-text-muted]">
-        Source Bus — Click to preview · Double-click to cut
+    <div className="flex flex-col gap-2 p-4 bg-[--color-surface-3] rounded-xl border border-[--color-border]">
+      <span className="text-xs font-bold uppercase tracking-widest text-[--color-text-muted]">
+        Source Bus
       </span>
+      <p className="text-[10px] text-[--color-text-muted]">Click to preview · Double-click to cut</p>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {sources.map((src) => (
           <div key={src.id} className="w-[140px] flex-shrink-0">
             <SourceCell sourceId={src.id} />
           </div>
         ))}
+        {sources.length === 0 && (
+          <p className="text-xs text-[--color-text-muted] py-4">No sources connected</p>
+        )}
       </div>
     </div>
   )

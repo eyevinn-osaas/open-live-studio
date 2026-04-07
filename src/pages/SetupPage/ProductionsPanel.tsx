@@ -94,7 +94,7 @@ export function ProductionsPanel() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Evening News — May 1"
-              className="w-full px-3 py-2 rounded bg-[--color-surface-1] border border-[--color-border] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+              className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
             />
           </div>
           <div className="flex justify-end gap-2">

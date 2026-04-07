@@ -23,9 +23,9 @@ export function JsonEditor({ value, onChange, error, className, readOnly = false
         spellCheck={false}
         className={cn(
           'w-full h-full min-h-[300px] p-3 rounded font-mono text-xs',
-          'bg-[--color-surface-1] text-[--color-text-primary] border resize-none',
+          'bg-[--color-surface-raised] text-[--color-text-primary] border resize-none',
           'focus:outline-none focus:ring-1 focus:ring-[--color-accent]',
-          error ? 'border-red-600' : 'border-[--color-border]',
+          error ? 'border-red-600' : 'border-[--color-border-strong]',
         )}
       />
       {error && (

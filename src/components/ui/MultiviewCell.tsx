@@ -30,7 +30,7 @@ export function MultiviewCell({ source }: MultiviewCellProps) {
       <VideoTile
         stream={stream}
         label={source.name}
-        sublabel={source.type}
+        sublabel={source.address}
         tally={tally}
         className="w-full rounded-none"
       />

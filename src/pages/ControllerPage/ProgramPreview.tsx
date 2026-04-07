@@ -27,7 +27,7 @@ function SourceMonitor({ source, tally }: { source: Source | undefined; tally: T
     <VideoTile
       stream={stream}
       label={source?.name ?? 'No Source'}
-      sublabel={source?.resolution}
+      sublabel={source?.address}
       tally={tally}
     />
   )

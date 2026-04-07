@@ -1,18 +1,15 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
+import { sourcesApi, type ApiSource } from '@/lib/api'
 
-export type SourceType = 'Camera' | 'SRT' | 'NDI' | 'Test'
-export type SourceStatus = 'connected' | 'connecting' | 'disconnected'
-export type Resolution = '3840x2160' | '1920x1080' | '1280x720'
+export type SourceStatus = 'active' | 'inactive'
 
 export interface Source {
   id: string
   name: string
-  type: SourceType
+  address: string
   status: SourceStatus
-  resolution: Resolution
-  lastSeenAt: number
   color: string
   liveCamera?: boolean
 }
@@ -24,11 +21,17 @@ interface SourcesState {
 }
 
 interface SourcesActions {
-  refresh: () => void
-  addSource: (source: Omit<Source, 'id' | 'lastSeenAt'>) => void
-  removeSource: (id: string) => void
-  updateStatus: (id: string, status: SourceStatus) => void
-  tickLastSeen: () => void
+  fetchAll: () => Promise<void>
+  refresh: () => Promise<void>
+  addSource: (source: Omit<Source, 'id'>) => Promise<void>
+  removeSource: (id: string) => Promise<void>
+  updateStatus: (id: string, status: SourceStatus) => Promise<void>
+}
+
+const SOURCE_COLOR = '#27272a'
+
+function fromApi(s: ApiSource): Source {
+  return { id: s.id, name: s.name, address: s.address, status: s.status, color: SOURCE_COLOR, liveCamera: s.liveCamera }
 }
 
 export const useSourcesStore = create<SourcesState & SourcesActions>()(
@@ -38,39 +41,52 @@ export const useSourcesStore = create<SourcesState & SourcesActions>()(
       lastFetchedAt: Date.now(),
       isLoading: false,
 
-      refresh: () =>
-        set((state) => {
-          state.isLoading = true
-        }),
+      fetchAll: async () => {
+        set((state) => { state.isLoading = true })
+        try {
+          const data = await sourcesApi.list()
+          set((state) => {
+            state.sources = data.map(fromApi)
+            state.isLoading = false
+            state.lastFetchedAt = Date.now()
+          })
+        } catch {
+          set((state) => { state.isLoading = false })
+        }
+      },
 
-      addSource: (source) =>
-        set((state) => {
-          const id = `src-${Date.now()}`
-          state.sources.push({ ...source, id, lastSeenAt: Date.now() })
-        }),
+      refresh: async () => {
+        set((state) => { state.isLoading = true })
+        try {
+          const data = await sourcesApi.list()
+          set((state) => {
+            state.sources = data.map(fromApi)
+            state.isLoading = false
+            state.lastFetchedAt = Date.now()
+          })
+        } catch {
+          set((state) => { state.isLoading = false })
+        }
+      },
 
-      removeSource: (id) =>
-        set((state) => {
-          state.sources = state.sources.filter((s) => s.id !== id)
-        }),
+      addSource: async (source) => {
+        const { color: _color, ...apiBody } = source
+        const created = await sourcesApi.create(apiBody)
+        set((state) => { state.sources.push(fromApi(created)) })
+      },
 
-      updateStatus: (id, status) =>
+      removeSource: async (id) => {
+        await sourcesApi.remove(id)
+        set((state) => { state.sources = state.sources.filter((s) => s.id !== id) })
+      },
+
+      updateStatus: async (id, status) => {
+        const updated = await sourcesApi.update(id, { status })
         set((state) => {
           const source = state.sources.find((s) => s.id === id)
-          if (source) {
-            source.status = status
-            if (status === 'connected') source.lastSeenAt = Date.now()
-          }
-        }),
-
-      tickLastSeen: () =>
-        set((state) => {
-          const now = Date.now()
-          state.sources.forEach((s) => {
-            if (s.status === 'connected') s.lastSeenAt = now
-          })
-          state.lastFetchedAt = now
-        }),
+          if (source) source.status = updated.status
+        })
+      },
     })),
     { name: 'sources' },
   ),

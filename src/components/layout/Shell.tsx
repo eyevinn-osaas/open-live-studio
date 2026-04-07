@@ -1,9 +1,9 @@
+import { useEffect } from 'react'
 import { Outlet } from 'react-router'
 import { NavBar } from './NavBar'
-import { useSourcePolling } from '@/hooks/useSourcePolling'
 import { useStreamDeck } from '@/hooks/useStreamDeck'
 import { useProductionStore } from '@/store/production.store'
-import { cn } from '@/lib/cn'
+import { useSourcesStore } from '@/store/sources.store'
 
 function LiveClock() {
   return (
@@ -14,8 +14,9 @@ function LiveClock() {
 }
 
 export function Shell() {
-  useSourcePolling()
   useStreamDeck()
+  const fetchAll = useSourcesStore((s) => s.fetchAll)
+  useEffect(() => { void fetchAll() }, [fetchAll])
 
   const isLive = useProductionStore((s) => s.isLive)
   const activeProductionId = useProductionStore((s) => s.activeProductionId)
@@ -25,28 +26,27 @@ export function Shell() {
       <NavBar />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header className="h-12 flex items-center justify-between px-4 border-b border-[--color-border] bg-[--color-surface-2] flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-[--color-text-primary] text-sm font-semibold tracking-wide">Open Live</span>
+        {/* Header — same bg as page so it blends in */}
+        <header className="h-14 flex items-center justify-between px-6 border-b border-[--color-border] bg-[--color-surface-2] flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <span className="text-[--color-text-primary] text-base font-bold tracking-wide">Open Live</span>
             {activeProductionId && (
-              <span className="text-[--color-text-muted] text-xs">{activeProductionId}</span>
+              <span className="text-[--color-text-muted] text-sm">{activeProductionId}</span>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <LiveClock />
             {isLive && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[--color-live] animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                <span className="text-white text-xs font-bold font-mono">ON AIR</span>
+              <div className="flex items-center gap-2 px-3 py-1 rounded bg-[--color-live] animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-white" />
+                <span className="text-white text-xs font-bold font-mono tracking-widest">ON AIR</span>
               </div>
             )}
           </div>
         </header>
 
-        {/* Page content */}
-        <main className={cn('flex-1 overflow-auto')}>
+        <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
       </div>

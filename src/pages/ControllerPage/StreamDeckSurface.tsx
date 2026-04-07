@@ -9,14 +9,12 @@ export function StreamDeckSurface() {
 
   async function handleConnect() {
     const dev = await requestStreamDeck()
-    if (dev) {
-      setDevice(dev)
-    }
+    if (dev) setDevice(dev)
   }
 
   if (!isSupported) {
     return (
-      <div className="p-3 rounded border border-[--color-border] bg-[--color-surface-2]">
+      <div className="p-4 rounded-xl border border-[--color-border] bg-[--color-surface-3]">
         <p className="text-xs text-[--color-text-muted] font-mono">
           WebHID not supported in this browser. Use Chrome or Edge for Stream Deck support.
         </p>
@@ -25,10 +23,10 @@ export function StreamDeckSurface() {
   }
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-[--color-surface-2] rounded border border-[--color-border]">
+    <div className="flex flex-col gap-4 p-4 bg-[--color-surface-3] rounded-xl border border-[--color-border]">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[--color-text-muted]">Stream Deck</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold uppercase tracking-widest text-[--color-text-muted]">Stream Deck</span>
           {isConnected && device && (
             <Badge variant="connected" label={device.productName.replace('Elgato Stream Deck', 'SD')} />
           )}
@@ -42,7 +40,9 @@ export function StreamDeckSurface() {
       </div>
 
       <p className="text-[10px] text-[--color-text-muted]">
-        {isConnected ? 'Physical buttons mapped below. Click to simulate.' : 'Virtual layout — click buttons to control the production.'}
+        {isConnected
+          ? 'Physical buttons mapped below. Click to simulate.'
+          : 'Virtual layout — click buttons to control the production.'}
       </p>
 
       <StreamDeckGrid />

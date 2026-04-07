@@ -30,7 +30,7 @@ export function ControllerPage() {
   useEffect(() => { localStorage.setItem(LS_KEY, gridSize) }, [gridSize])
 
   const sources = useSourcesStore(useShallow((s) =>
-    s.sources.filter((src) => src.status !== 'disconnected').slice(0, GRID_MAX[gridSize])
+    s.sources.slice(0, GRID_MAX[gridSize])
   ))
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -69,19 +69,19 @@ export function ControllerPage() {
         <ProgramPreview />
 
         {/* Multiviewer */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3 p-4 bg-[--color-surface-3] rounded-xl border border-[--color-border]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[--color-text-muted]">Multiviewer</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[--color-text-muted]">Multiviewer</span>
             <div className="flex gap-1">
               {(['2x2', '3x3', '4x4'] as GridSize[]).map((size) => (
                 <button
                   key={size}
                   onClick={() => setGridSize(size)}
                   className={cn(
-                    'px-2 py-0.5 rounded text-[10px] font-mono uppercase transition-colors',
+                    'px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase transition-all',
                     gridSize === size
-                      ? 'bg-[--color-accent] text-[#1a1a1a]'
-                      : 'bg-[--color-surface-3] text-[--color-text-muted] hover:text-[--color-text-primary]',
+                      ? 'bg-[--color-accent] text-[--color-text-dark]'
+                      : 'bg-[--color-surface-raised] text-[--color-text-muted] hover:text-[--color-text-primary] border border-[--color-border-strong]',
                   )}
                 >
                   {size}
@@ -89,7 +89,7 @@ export function ControllerPage() {
               ))}
             </div>
           </div>
-          <div className="bg-black p-px rounded overflow-hidden">
+          <div className="bg-black rounded-lg overflow-hidden">
             <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
               {sources.map((src) => (
                 <MultiviewCell key={src.id} source={src} />
