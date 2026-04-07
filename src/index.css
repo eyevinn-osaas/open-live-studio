@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pgm: #dc2626;
+  --color-pvw: #16a34a;
+  --color-tally-off: #3f3f46;
+  --color-live: #ef4444;
+  --color-accent: #6366f1;
+
+  --color-surface-1: #09090b;
+  --color-surface-2: #18181b;
+  --color-surface-3: #27272a;
+  --color-border: #3f3f46;
+
+  --color-text-primary: #fafafa;
+  --color-text-muted: #a1a1aa;
+
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-surface-1);
+  color: var(--color-text-primary);
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tally ring utilities */
+.ring-pgm {
+  --tw-ring-color: var(--color-pgm);
+}
+.ring-pvw {
+  --tw-ring-color: var(--color-pvw);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface-2);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}

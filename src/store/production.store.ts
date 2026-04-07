@@ -1,0 +1,95 @@
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+import { devtools } from 'zustand/middleware'
+
+export type TransitionType = 'cut' | 'mix' | 'wipe'
+
+interface ProductionState {
+  pgmSourceId: string | null
+  pvwSourceId: string | null
+  isLive: boolean
+  transitionType: TransitionType
+  transitionDurationMs: number
+  tBarPosition: number // 0.0–1.0
+  activeProductionId: string | null
+}
+
+interface ProductionActions {
+  cut: () => void
+  take: () => void
+  setPvw: (sourceId: string) => void
+  setPgm: (sourceId: string) => void
+  setTransitionType: (type: TransitionType) => void
+  setTransitionDuration: (ms: number) => void
+  setTBarPosition: (pos: number) => void
+  setLive: (live: boolean) => void
+  setActiveProduction: (id: string | null) => void
+}
+
+export const useProductionStore = create<ProductionState & ProductionActions>()(
+  devtools(
+    immer((set) => ({
+      // State
+      pgmSourceId: 'src-1',
+      pvwSourceId: 'src-2',
+      isLive: false,
+      transitionType: 'cut',
+      transitionDurationMs: 500,
+      tBarPosition: 0,
+      activeProductionId: 'prod-1',
+
+      // Actions
+      cut: () =>
+        set((state) => {
+          const temp = state.pgmSourceId
+          state.pgmSourceId = state.pvwSourceId
+          state.pvwSourceId = temp
+        }),
+
+      take: () =>
+        set((state) => {
+          // For mix/wipe: swap PVW → PGM (same as cut in mock, animation would differ in real app)
+          const temp = state.pgmSourceId
+          state.pgmSourceId = state.pvwSourceId
+          state.pvwSourceId = temp
+          state.tBarPosition = 0
+        }),
+
+      setPvw: (sourceId) =>
+        set((state) => {
+          state.pvwSourceId = sourceId
+        }),
+
+      setPgm: (sourceId) =>
+        set((state) => {
+          state.pgmSourceId = sourceId
+        }),
+
+      setTransitionType: (type) =>
+        set((state) => {
+          state.transitionType = type
+        }),
+
+      setTransitionDuration: (ms) =>
+        set((state) => {
+          state.transitionDurationMs = ms
+        }),
+
+      setTBarPosition: (pos) =>
+        set((state) => {
+          state.tBarPosition = Math.max(0, Math.min(1, pos))
+        }),
+
+      setLive: (live) =>
+        set((state) => {
+          state.isLive = live
+        }),
+
+      setActiveProduction: (id) =>
+        set((state) => {
+          state.activeProductionId = id
+        }),
+    })),
+    { name: 'production' },
+  ),
+)
