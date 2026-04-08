@@ -1,16 +1,23 @@
 import { useEffect, useCallback, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useWebRTC } from '@/hooks/useWebRTC'
+import { useControllerWs } from '@/hooks/useControllerWs'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { MultiviewCell } from '@/components/ui/MultiviewCell'
 import { ProgramPreview } from './ProgramPreview'
-import { SourceBus } from './SourceBus'
+import { SourceBusDual } from './SourceBusDual'
 import { TransitionPanel } from './TransitionPanel'
 import { GraphicsPanel } from './GraphicsPanel'
 import { StreamDeckSurface } from './StreamDeckSurface'
+import { DskPanel } from './DskPanel'
+import { AudioPanel } from './AudioPanel'
+import { MacroBar } from './MacroBar'
+import { TimerBar } from './TimerBar'
+import { StreamingStatus } from './StreamingStatus'
 import { useProductionStore } from '@/store/production.store'
 import { useSourcesStore } from '@/store/sources.store'
+import { useStatsStore } from '@/store/stats.store'
 import { cn } from '@/lib/cn'
 
 type GridSize = '2x2' | '3x3' | '4x4'
@@ -21,13 +28,26 @@ const LS_KEY = 'openlive:multiviewer-grid'
 export function ControllerPage() {
   useWebRTC()
 
-  const { isLive, setLive, cut, take } = useProductionStore()
+  const { isLive, setLive, cut, take, activeProductionId } = useProductionStore()
+  const send = useControllerWs(activeProductionId)
+  const startPolling = useStatsStore((s) => s.startPolling)
+  const stopPolling = useStatsStore((s) => s.stopPolling)
 
   const [gridSize, setGridSize] = useState<GridSize>(() =>
     (localStorage.getItem(LS_KEY) as GridSize | null) ?? '2x2'
   )
 
   useEffect(() => { localStorage.setItem(LS_KEY, gridSize) }, [gridSize])
+
+  // Start/stop streaming stats polling with the active production
+  useEffect(() => {
+    if (activeProductionId) {
+      startPolling(activeProductionId)
+    } else {
+      stopPolling()
+    }
+    return () => stopPolling()
+  }, [activeProductionId, startPolling, stopPolling])
 
   const sources = useSourcesStore(useShallow((s) =>
     s.sources.slice(0, GRID_MAX[gridSize])
@@ -44,6 +64,20 @@ export function ControllerPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  const handleGoLive = () => {
+    const next = !isLive
+    setLive(next)
+    send(next ? { type: 'GO_LIVE' } : { type: 'CUT_STREAM' })
+  }
+
+  const handleDskToggle = (layer: number, visible: boolean) => {
+    send({ type: 'DSK_TOGGLE', layer, visible })
+  }
+
+  const handleMacroExec = (macroId: string) => {
+    send({ type: 'MACRO_EXEC', macroId })
+  }
+
   const cols = GRID_COLS[gridSize]
   const maxCells = GRID_MAX[gridSize]
   const emptyCells = Math.max(0, maxCells - sources.length)
@@ -54,19 +88,40 @@ export function ControllerPage() {
         title="Controller"
         subtitle="Space = Cut  ·  Enter = Take"
         actions={
-          <Button
-            variant={isLive ? 'pgm' : 'default'}
-            size="md"
-            onClick={() => setLive(!isLive)}
-          >
-            {isLive ? '● ON AIR' : '○ Go Live'}
-          </Button>
+          <div className="flex items-center gap-4">
+            <TimerBar />
+            <StreamingStatus />
+            <Button
+              variant={isLive ? 'pgm' : 'default'}
+              size="md"
+              onClick={handleGoLive}
+            >
+              {isLive ? '● ON AIR' : '○ Go Live'}
+            </Button>
+          </div>
         }
       />
 
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-4">
-        {/* PGM / PVW monitors */}
-        <ProgramPreview />
+        {/* Main 3-column layout on large screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] gap-4 items-start">
+          {/* Left: Source Bus */}
+          <div className="lg:w-64 xl:w-72">
+            <SourceBusDual />
+          </div>
+
+          {/* Centre: PGM/PVW + Transitions + DSK */}
+          <div className="flex flex-col gap-3">
+            <ProgramPreview />
+            <TransitionPanel />
+            <DskPanel onToggle={handleDskToggle} />
+          </div>
+
+          {/* Right: Audio */}
+          <div className="lg:w-56 xl:w-64">
+            <AudioPanel />
+          </div>
+        </div>
 
         {/* Multiviewer */}
         <div className="flex flex-col gap-3 p-4 bg-[--color-surface-3] rounded-xl border border-[--color-border]">
@@ -103,14 +158,13 @@ export function ControllerPage() {
           </div>
         </div>
 
-        {/* Source bus */}
-        <SourceBus />
+        {/* Macro bar */}
+        {activeProductionId && (
+          <MacroBar productionId={activeProductionId} onExec={handleMacroExec} />
+        )}
 
-        {/* Transition + Graphics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <TransitionPanel />
-          <GraphicsPanel />
-        </div>
+        {/* Graphics */}
+        <GraphicsPanel />
 
         {/* Stream Deck */}
         <StreamDeckSurface />
