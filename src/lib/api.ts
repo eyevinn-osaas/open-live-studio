@@ -101,11 +101,8 @@ export const productionsApi = {
     }).then(normalizeProduction),
 
   activate: (id: string) =>
-    request<RawProduction & { stromVersion?: string | null }>(`/api/v1/productions/${id}/activate`, { method: 'POST' })
-      .then((d) => {
-        console.log(`[Strom] version: ${d.stromVersion ?? 'unreachable'}`)
-        return normalizeProduction(d)
-      }),
+    request<RawProduction>(`/api/v1/productions/${id}/activate`, { method: 'POST' })
+      .then(normalizeProduction),
 
   deactivate: (id: string) =>
     request<RawProduction>(`/api/v1/productions/${id}/deactivate`, { method: 'POST' })
