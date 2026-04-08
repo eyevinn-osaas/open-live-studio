@@ -137,6 +137,78 @@ export const sourcesApi = {
     request<void>(`/api/v1/sources/${id}`, { method: 'DELETE' }),
 }
 
+// --------------- Macro types ---------------
+
+export interface ApiMacroAction {
+  type: 'CUT' | 'TRANSITION' | 'TAKE' | 'GRAPHIC_ON' | 'GRAPHIC_OFF' | 'DSK_TOGGLE'
+  sourceId?: string
+  transitionType?: string
+  durationMs?: number
+  overlayId?: string
+  layer?: number
+  visible?: boolean
+}
+
+export interface ApiMacro {
+  id: string
+  slot: number
+  label: string
+  color: string
+  actions: ApiMacroAction[]
+}
+
+export interface ApiAudioElement {
+  id: string
+  blockId: string
+  elementId: string
+  label: string
+}
+
+export interface ApiStreamingStats {
+  active: boolean
+  rtpStats?: unknown
+  webrtcStats?: unknown
+  error?: string
+}
+
+export const macrosApi = {
+  list: (productionId: string) =>
+    request<ApiMacro[]>(`/api/v1/productions/${productionId}/macros`),
+
+  create: (productionId: string, body: Omit<ApiMacro, 'id'>) =>
+    request<ApiMacro>(`/api/v1/productions/${productionId}/macros`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  update: (productionId: string, macroId: string, body: Partial<Omit<ApiMacro, 'id'>>) =>
+    request<ApiMacro>(`/api/v1/productions/${productionId}/macros/${macroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  remove: (productionId: string, macroId: string) =>
+    request<void>(`/api/v1/productions/${productionId}/macros/${macroId}`, { method: 'DELETE' }),
+}
+
+export const audioApi = {
+  getElement: (productionId: string, elementId: string) =>
+    request<{ element_id: string; properties: Record<string, unknown> }>(
+      `/api/v1/productions/${productionId}/audio/${elementId}`,
+    ),
+
+  updateElement: (productionId: string, elementId: string, body: { property: string; value: unknown }) =>
+    request<{ element_id: string; properties: Record<string, unknown> }>(
+      `/api/v1/productions/${productionId}/audio/${elementId}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+}
+
+export const statsApi = {
+  streaming: (productionId: string) =>
+    request<ApiStreamingStats>(`/api/v1/productions/${productionId}/stats/streaming`),
+}
+
 export const templatesApi = {
   list: () =>
     request<ApiTemplate[]>('/api/v1/templates'),

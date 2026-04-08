@@ -8,6 +8,8 @@ export type ButtonAction =
   | { type: 'go-live' }
   | { type: 'graphic-toggle'; graphicId: string }
   | { type: 'transition'; mode: 'cut' | 'mix' | 'wipe' }
+  | { type: 'dsk-toggle'; layer: number }
+  | { type: 'macro-exec'; macroId: string }
   | { type: 'none' }
 
 export interface StreamDeckButton {
