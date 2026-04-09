@@ -55,7 +55,6 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
           const temp = state.pgmSourceId
           state.pgmSourceId = state.pvwSourceId
           state.pvwSourceId = temp
-          state.tBarPosition = 0
           state.isFtb = false
         }),
 
