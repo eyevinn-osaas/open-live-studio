@@ -1,4 +1,10 @@
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+// Runtime env injection: docker-entrypoint.sh writes /env-config.js which sets
+// window._env_.VITE_API_URL so the backend URL can be changed without rebuilding
+// the image (required for OSC parameter store injection).
+const BASE =
+  (typeof window !== 'undefined' && (window as unknown as { _env_?: { VITE_API_URL?: string } })._env_?.VITE_API_URL) ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:3000'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
