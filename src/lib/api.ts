@@ -6,9 +6,14 @@ const BASE =
   import.meta.env.VITE_API_URL ||
   'http://localhost:3000'
 
+import { getApiToken } from './sat.js'
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getApiToken()
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
     ...init,
   })
   if (!res.ok) {
