@@ -13,9 +13,22 @@ function timeSince(ts: number): string {
 }
 
 const STREAM_TYPE_LABELS: Record<StreamType, string> = {
-  srt: 'SRT',
+  srt: 'MPEG-TS/SRT',
+  efp: 'EFP/SRT',
   whip: 'WHIP',
+  test1: 'Test 1',
+  test2: 'Test 2',
 }
+
+const STREAM_TYPE_HAS_ADDRESS: Record<StreamType, boolean> = {
+  srt: true,
+  efp: true,
+  whip: false,
+  test1: false,
+  test2: false,
+}
+
+const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'whip']
 
 export function SourcesPanel() {
   const { sources, isLoading, lastFetchedAt, removeSource, addSource } = useSourcesStore()
@@ -59,7 +72,9 @@ export function SourcesPanel() {
                   {STREAM_TYPE_LABELS[src.streamType]}
                 </span>
               </div>
-              <span className="text-xs text-[--color-text-muted] font-mono truncate block">{src.address}</span>
+              {STREAM_TYPE_HAS_ADDRESS[src.streamType] && (
+                <span className="text-xs text-[--color-text-muted] font-mono truncate block">{src.address}</span>
+              )}
             </div>
             <Button size="sm" variant="ghost" onClick={() => removeSource(src.id)} className="opacity-40 hover:opacity-100">✕</Button>
           </div>
@@ -80,33 +95,35 @@ export function SourcesPanel() {
           </div>
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Stream Type</label>
-            <div className="flex gap-2">
-              {(['srt', 'whip'] as StreamType[]).map((t) => (
+            <div className="grid grid-cols-3 gap-2" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+              {CREATABLE_STREAM_TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
-                  onClick={() => setNewStreamType(t)}
-                  className={`flex-1 py-2 rounded text-sm font-mono uppercase transition-colors ${
+                  onClick={() => { setNewStreamType(t); setNewAddress('') }}
+                  className={`py-2 rounded text-sm border transition-colors ${
                     newStreamType === t
-                      ? 'bg-[--color-accent] text-white'
-                      : 'bg-[--color-surface-raised] border border-[--color-border-strong] text-[--color-text-muted] hover:text-[--color-text-primary]'
+                      ? 'bg-[var(--color-accent)] border-[var(--color-accent)] text-white'
+                      : 'bg-[var(--color-surface-2)] border-[var(--color-border-strong)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
                   }`}
                 >
-                  {t}
+                  {STREAM_TYPE_LABELS[t]}
                 </button>
               ))}
             </div>
           </div>
+          {STREAM_TYPE_HAS_ADDRESS[newStreamType] && (
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Address</label>
             <input
               type="text"
               value={newAddress}
               onChange={(e) => setNewAddress(e.target.value)}
-              placeholder={newStreamType === 'srt' ? 'srt://192.168.1.10:9000' : 'https://ingest.example.com/whip/token'}
+              placeholder={newStreamType === 'srt' || newStreamType === 'efp' ? 'srt://192.168.1.10:9000' : ''}
               className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
             />
           </div>
+          )}
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
             <Button variant="active" onClick={handleAdd} disabled={!newName.trim()}>Add Source</Button>

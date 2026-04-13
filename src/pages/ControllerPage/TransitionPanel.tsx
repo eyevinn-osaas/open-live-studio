@@ -1,6 +1,5 @@
 import { useProductionStore, type TransitionType } from '@/store/production.store'
 import { useProductionsStore } from '@/store/productions.store'
-import { useTemplatesStore } from '@/store/templates.store'
 import { useSourcesStore } from '@/store/sources.store'
 import { cn } from '@/lib/cn'
 import { useRef, useCallback } from 'react'
@@ -12,7 +11,7 @@ interface TransitionPanelProps {
   onCut: () => void
   onAuto: () => void
   onFtb: () => void
-  onSelectPvw: (sourceId: string) => void
+  onSelectPvw: (mixerInput: string) => void
   onSetOvl: (alpha: number) => void
 }
 
@@ -23,28 +22,28 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
     ovlTimerRef.current = setTimeout(() => onSetOvl(alpha), 150)
   }, [onSetOvl])
   const {
-    pgmSourceId, pvwSourceId, isFtb,
+    pgmInput, pvwInput, isFtb,
     transitionType, transitionDurationMs, tBarPosition,
     setPgm, setTransitionType, setTransitionDuration, setTBarPosition,
     activeProductionId,
   } = useProductionStore()
 
   const production = useProductionsStore((s) => s.productions.find((p) => p.id === activeProductionId))
-  const template = useTemplatesStore((s) => s.templates.find((t) => t.id === production?.templateId))
   const sources = useSourcesStore((s) => s.sources)
 
-  const slots = template?.inputs ?? []
+  const VIRTUAL_SOURCE_NAMES: Record<string, string> = {
+    '__test1__': 'Test - Pinwheel',
+    '__test2__': 'Test - Colors',
+  }
 
-  // Map slotId → Source object
-  const slotSource = Object.fromEntries(
-    (production?.sources ?? []).flatMap((a) => {
-      const source = sources.find((s) => s.id === a.sourceId)
-      return source ? [[a.mixerInput, source]] : []
+  // One slot per assignment, sorted by mixer input — handles duplicates and virtual sources
+  const inputSlots = [...(production?.sources ?? [])]
+    .sort((a, b) => a.mixerInput.localeCompare(b.mixerInput))
+    .map((a) => {
+      const realSource = sources.find((s) => s.id === a.sourceId)
+      const name = realSource?.name ?? VIRTUAL_SOURCE_NAMES[a.sourceId] ?? a.sourceId
+      return { mixerInput: a.mixerInput, sourceId: a.sourceId, name }
     })
-  )
-
-  // When no template inputs are defined, fall back to all available sources
-  const fallbackSources = slots.length === 0 ? sources : []
 
   const labelClass = 'flex items-center justify-center w-10 shrink-0 text-[10px] font-mono font-bold uppercase tracking-widest'
   const rowClass = 'flex items-center gap-1 flex-1 overflow-x-auto px-2 py-2'
@@ -59,41 +58,22 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
           PGM
         </div>
         <div className={rowClass}>
-          {slots.length === 0 && fallbackSources.length === 0 && (
+          {inputSlots.length === 0 && (
             <span className="text-[10px] text-[--color-text-muted] italic">
               {!production?.templateId ? 'No template assigned' : 'No sources available'}
             </span>
           )}
-          {slots.map((slot) => {
-            const source = slotSource[slot.id]
-            const isActive = !!source && pgmSourceId === source.id
-            return (
-              <div
-                key={slot.id}
-                className={cn(
-                  'flex-1 min-w-16 py-1.5 px-2 rounded text-xs font-bold truncate border cursor-default select-none flex items-center justify-center',
-                  isActive
-                    ? 'bg-red-600 border-white text-white'
-                    : source
-                      ? 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted]'
-                      : 'bg-[--color-surface] border-[--color-border] text-[--color-text-muted] opacity-40',
-                )}
-              >
-                {source?.name ?? slot.id}
-              </div>
-            )
-          })}
-          {fallbackSources.map((source) => (
+          {inputSlots.map((slot) => (
             <div
-              key={source.id}
+              key={slot.mixerInput}
               className={cn(
                 'flex-1 min-w-16 py-1.5 px-2 rounded text-xs font-bold truncate border cursor-default select-none flex items-center justify-center',
-                pgmSourceId === source.id
+                pgmInput === slot.mixerInput
                   ? 'bg-red-600 border-white text-white'
                   : 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted]',
               )}
             >
-              {source.name}
+              {slot.name}
             </div>
           ))}
         </div>
@@ -130,52 +110,29 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
           PVW
         </div>
         <div className={rowClass}>
-          {slots.length === 0 && fallbackSources.length === 0 && (
+          {inputSlots.length === 0 && (
             <span className="text-[10px] text-[--color-text-muted] italic">
               {!production?.templateId ? 'No template assigned' : 'No sources available'}
             </span>
           )}
-          {slots.map((slot) => {
-            const source = slotSource[slot.id]
-            const isActive = !!source && pvwSourceId === source.id
-            const isOnPgm = !!source && pgmSourceId === source.id
+          {inputSlots.map((slot) => {
+            const isOnPgm = pgmInput === slot.mixerInput
+            const isActive = pvwInput === slot.mixerInput
             return (
               <button
-                key={slot.id}
-                onClick={() => source && !isOnPgm && onSelectPvw(source.id)}
-                disabled={!source || isOnPgm}
+                key={slot.mixerInput}
+                onClick={() => !isOnPgm && onSelectPvw(slot.mixerInput)}
+                disabled={isOnPgm}
                 className={cn(
                   'flex-1 min-w-16 py-1.5 px-2 rounded text-xs font-bold truncate transition-all border',
                   isActive
                     ? 'bg-green-600 border-white text-white'
                     : isOnPgm
                       ? 'bg-[--color-surface] border-[--color-border] text-[--color-text-muted] opacity-40 cursor-default'
-                      : source
-                        ? 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted] hover:text-[--color-text-primary] hover:border-[--color-pvw]/50'
-                        : 'bg-[--color-surface] border-[--color-border] text-[--color-text-muted] opacity-40 cursor-default',
-                )}
-              >
-                {source?.name ?? slot.id}
-              </button>
-            )
-          })}
-          {fallbackSources.map((source) => {
-            const isOnPgm = pgmSourceId === source.id
-            return (
-              <button
-                key={source.id}
-                onClick={() => !isOnPgm && onSelectPvw(source.id)}
-                disabled={isOnPgm}
-                className={cn(
-                  'flex-1 min-w-16 py-1.5 px-2 rounded text-xs font-bold truncate transition-all border',
-                  pvwSourceId === source.id
-                    ? 'bg-green-600 border-white text-white'
-                    : isOnPgm
-                      ? 'bg-[--color-surface] border-[--color-border] text-[--color-text-muted] opacity-40 cursor-default'
                       : 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted] hover:text-[--color-text-primary] hover:border-[--color-pvw]/50',
                 )}
               >
-                {source.name}
+                {slot.name}
               </button>
             )
           })}

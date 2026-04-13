@@ -5,8 +5,10 @@ import { devtools } from 'zustand/middleware'
 export type TransitionType = 'mix' | 'dip' | 'push'
 
 interface ProductionState {
-  pgmSourceId: string | null
-  pvwSourceId: string | null
+  /** Active mixer input on program, e.g. "video_in_0" */
+  pgmInput: string | null
+  /** Active mixer input on preview */
+  pvwInput: string | null
   isLive: boolean
   isFtb: boolean
   transitionType: TransitionType
@@ -19,8 +21,8 @@ interface ProductionActions {
   cut: () => void
   auto: () => void
   ftb: () => void
-  setPvw: (sourceId: string) => void
-  setPgm: (sourceId: string) => void
+  setPvw: (mixerInput: string) => void
+  setPgm: (mixerInput: string) => void
   setTransitionType: (type: TransitionType) => void
   setTransitionDuration: (ms: number) => void
   setTBarPosition: (pos: number) => void
@@ -32,8 +34,8 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
   devtools(
     immer((set) => ({
       // State
-      pgmSourceId: null,
-      pvwSourceId: null,
+      pgmInput: null,
+      pvwInput: null,
       isLive: false,
       isFtb: false,
       transitionType: 'mix',
@@ -44,17 +46,17 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       // Actions
       cut: () =>
         set((state) => {
-          const temp = state.pgmSourceId
-          state.pgmSourceId = state.pvwSourceId
-          state.pvwSourceId = temp
+          const temp = state.pgmInput
+          state.pgmInput = state.pvwInput
+          state.pvwInput = temp
           state.isFtb = false
         }),
 
       auto: () =>
         set((state) => {
-          const temp = state.pgmSourceId
-          state.pgmSourceId = state.pvwSourceId
-          state.pvwSourceId = temp
+          const temp = state.pgmInput
+          state.pgmInput = state.pvwInput
+          state.pvwInput = temp
           state.isFtb = false
         }),
 
@@ -63,14 +65,14 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
           state.isFtb = !state.isFtb
         }),
 
-      setPvw: (sourceId) =>
+      setPvw: (mixerInput) =>
         set((state) => {
-          state.pvwSourceId = sourceId
+          state.pvwInput = mixerInput
         }),
 
-      setPgm: (sourceId) =>
+      setPgm: (mixerInput) =>
         set((state) => {
-          state.pgmSourceId = sourceId
+          state.pgmInput = mixerInput
         }),
 
       setTransitionType: (type) =>

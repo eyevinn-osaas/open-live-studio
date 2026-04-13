@@ -7,12 +7,12 @@ import { cn } from '@/lib/cn'
 type Tab = 'sources' | 'productions'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'sources', label: 'Sources' },
   { id: 'productions', label: 'Productions' },
+  { id: 'sources', label: 'Sources' },
 ]
 
 export function SetupPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('sources')
+  const [activeTab, setActiveTab] = useState<Tab>('productions')
 
   return (
     <div className="flex flex-col h-full">

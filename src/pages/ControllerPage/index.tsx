@@ -15,7 +15,7 @@ import { useProductionsStore } from '@/store/productions.store'
 import { useStatsStore } from '@/store/stats.store'
 
 export function ControllerPage() {
-  const { isLive, setLive, cut, auto, ftb, setPvw, pvwSourceId, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
+  const { isLive, setLive, cut, auto, ftb, setPvw, pvwInput, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
   const whepEndpoint = useProductionsStore(
     (s) => s.productions.find((p) => p.id === activeProductionId)?.whepEndpoint,
@@ -42,20 +42,20 @@ export function ControllerPage() {
 
   const handleCut = useCallback(() => {
     cut()
-    send({ type: 'CUT', sourceId: pvwSourceId ?? '' })
-  }, [cut, send, pvwSourceId])
+    send({ type: 'CUT', mixerInput: pvwInput ?? '' })
+  }, [cut, send, pvwInput])
 
   const handleAuto = useCallback(() => {
     auto()
-    send({ type: 'TRANSITION', sourceId: pvwSourceId ?? '', transitionType, durationMs: transitionDurationMs })
-  }, [auto, send, pvwSourceId, transitionType, transitionDurationMs])
+    send({ type: 'TRANSITION', mixerInput: pvwInput ?? '', transitionType, durationMs: transitionDurationMs })
+  }, [auto, send, pvwInput, transitionType, transitionDurationMs])
 
   const handleFtb = useCallback(() => { ftb(); send({ type: 'FTB', durationMs: transitionDurationMs }) }, [ftb, send, transitionDurationMs])
   const handleSetOvl = useCallback((alpha: number) => { send({ type: 'SET_OVL', alpha }) }, [send])
 
-  const handleSelectPvw = useCallback((sourceId: string) => {
-    setPvw(sourceId)
-    send({ type: 'SET_PVW', sourceId })
+  const handleSelectPvw = useCallback((mixerInput: string) => {
+    setPvw(mixerInput)
+    send({ type: 'SET_PVW', mixerInput })
   }, [setPvw, send])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -94,9 +94,9 @@ export function ControllerPage() {
               className="h-9 appearance-none rounded-md border border-[--color-border] bg-[--color-surface] pl-3 pr-8 text-sm font-bold text-[--color-text-primary] focus:outline-none focus:ring-2 focus:ring-[--color-accent]"
             >
               <option value="">— No production —</option>
-              {productions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}{p.status === 'active' ? ' ●' : p.status === 'activating' ? ' ◌' : ''}
+              {productions.filter((p) => p.status === 'active' || p.status === 'activating').map((p) => (
+                <option key={p.id} value={p.id} disabled={p.status === 'activating'}>
+                  {p.name}{p.status === 'activating' ? ' ◌' : ''}
                 </option>
               ))}
             </select>

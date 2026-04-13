@@ -5,10 +5,10 @@ const WS_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000')
   .replace(/^http/, 'ws')
 
 type OutboundMessage =
-  | { type: 'CUT'; sourceId: string }
-  | { type: 'TRANSITION'; sourceId: string; transitionType: string; durationMs?: number }
+  | { type: 'CUT'; mixerInput: string }
+  | { type: 'TRANSITION'; mixerInput: string; transitionType: string; durationMs?: number }
   | { type: 'TAKE' }
-  | { type: 'SET_PVW'; sourceId: string }
+  | { type: 'SET_PVW'; mixerInput: string }
   | { type: 'FTB'; active?: boolean; durationMs?: number }
   | { type: 'SET_OVL'; alpha: number }
   | { type: 'GO_LIVE' }
@@ -56,7 +56,6 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
           case 'ON_AIR':
             setLive(!!msg['value'])
             break
-          // DSK_STATE, MACRO_EXECUTED, MACRO_ERROR — handled by consumers if needed
         }
       } catch {
         // ignore malformed frames

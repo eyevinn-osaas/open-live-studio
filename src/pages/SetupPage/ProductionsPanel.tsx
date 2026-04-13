@@ -19,31 +19,51 @@ const selectCls =
 const inputCls =
   'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]'
 
+const MAX_INPUTS = 10
+const MIN_INPUTS = 2
+
+function mixerInput(index: number) { return `video_in_${index}` }
+
 // ---------------------------------------------------------------------------
-// Source slot row — one template input
+// Source slot row — one input
 // ---------------------------------------------------------------------------
 
 interface SlotRowProps {
-  slotId: string
+  index: number
   currentSourceId: string
+  canRemove: boolean
   onChange: (sourceId: string) => void
+  onRemove: () => void
 }
 
-function SlotRow({ slotId, currentSourceId, onChange }: SlotRowProps) {
+function SlotRow({ index, currentSourceId, canRemove, onChange, onRemove }: SlotRowProps) {
   const sources = useSourcesStore((s) => s.sources)
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs font-mono text-[--color-text-muted] w-28 shrink-0 truncate" title={slotId}>
-        {slotId}
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-mono text-[--color-text-muted] w-16 shrink-0 text-right">
+        Input {index + 1}
       </span>
-      <select value={currentSourceId} onChange={(e) => onChange(e.target.value)} className={selectCls}>
+      <select value={currentSourceId} onChange={(e) => onChange(e.target.value)} className={`${selectCls} flex-1`}>
         <option value="">— unassigned —</option>
         {sources.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name} ({s.streamType.toUpperCase()})
           </option>
         ))}
+        <optgroup label="Test Streams">
+          <option value="__test1__">Test - Pinwheel</option>
+          <option value="__test2__">Test - Colors</option>
+        </optgroup>
       </select>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={!canRemove}
+        className="text-[--color-text-muted] hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed text-sm px-1 transition-colors"
+        title="Remove input"
+      >
+        ✕
+      </button>
     </div>
   )
 }
@@ -61,59 +81,66 @@ interface ConfigureModalProps {
 function ConfigureSourcesModal({ production, template, onClose }: ConfigureModalProps) {
   const { assignSource, unassignSource } = useProductionsStore()
 
-  // Local copy so UI updates immediately without a re-fetch
   const [assignments, setAssignments] = useState<Record<string, string>>(() =>
     Object.fromEntries(production.sources.map((s) => [s.mixerInput, s.sourceId]))
   )
+  const [slotCount, setSlotCount] = useState(() =>
+    Math.max(MIN_INPUTS, production.sources.length)
+  )
 
-  async function handleChange(mixerInput: string, sourceId: string) {
-    setAssignments((prev) => ({ ...prev, [mixerInput]: sourceId }))
+  async function handleChange(index: number, sourceId: string) {
+    const pad = mixerInput(index)
+    setAssignments((prev) => ({ ...prev, [pad]: sourceId }))
     if (sourceId) {
-      await assignSource(production.id, { mixerInput, sourceId })
+      await assignSource(production.id, { mixerInput: pad, sourceId })
     } else {
-      await unassignSource(production.id, mixerInput)
+      await unassignSource(production.id, pad)
     }
   }
 
+  async function handleRemove(index: number) {
+    if (slotCount <= MIN_INPUTS) return
+    const pad = mixerInput(index)
+    if (assignments[pad]) {
+      await unassignSource(production.id, pad)
+      setAssignments((prev) => { const n = { ...prev }; delete n[pad]; return n })
+    }
+    setSlotCount((c) => c - 1)
+  }
+
   const assigned = Object.values(assignments).filter(Boolean).length
-  const total = template.inputs.length
 
   return (
-    <Modal
-      open
-      title={`Configure Sources — ${production.name}`}
-      onClose={onClose}
-      className="max-w-xl"
-    >
+    <Modal open title={`Configure Sources — ${production.name}`} onClose={onClose} className="max-w-xl">
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-[--color-text-muted]">
             Template: <span className="text-[--color-text-primary] font-medium">{template.name}</span>
           </span>
-          <span className={`text-xs font-mono ${assigned === total ? 'text-green-400' : 'text-[--color-text-muted]'}`}>
-            {assigned}/{total} assigned
-          </span>
+          <span className="text-xs font-mono text-[--color-text-muted]">{assigned} assigned</span>
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3 pb-1 border-b border-[--color-border]">
-            <span className="text-xs uppercase tracking-wider text-[--color-text-muted] w-28 shrink-0">Input slot</span>
-            <span className="text-xs uppercase tracking-wider text-[--color-text-muted]">Source</span>
-          </div>
-          {template.inputs.map((slot) => (
+          {Array.from({ length: slotCount }, (_, i) => (
             <SlotRow
-              key={slot.id}
-              slotId={slot.id}
-              currentSourceId={assignments[slot.id] ?? ''}
-              onChange={(sourceId) => handleChange(slot.id, sourceId)}
+              key={i}
+              index={i}
+              currentSourceId={assignments[mixerInput(i)] ?? ''}
+              canRemove={slotCount > MIN_INPUTS}
+              onChange={(sourceId) => void handleChange(i, sourceId)}
+              onRemove={() => void handleRemove(i)}
             />
           ))}
         </div>
 
-        {template.inputs.length === 0 && (
-          <p className="text-sm text-[--color-text-muted] text-center py-4">
-            This template has no input slots defined.
-          </p>
+        {slotCount < MAX_INPUTS && (
+          <button
+            type="button"
+            onClick={() => setSlotCount((c) => c + 1)}
+            className="text-xs text-[--color-accent] hover:opacity-80 text-left transition-opacity"
+          >
+            + Add Input
+          </button>
         )}
 
         <div className="flex justify-end pt-1">
@@ -139,12 +166,18 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
   const sources = useSourcesStore((s) => s.sources)
 
   const [name, setName] = useState('')
-  const [templateId, setTemplateId] = useState('')
+  const [templateId, setTemplateId] = useState(() => templates[0]?.id ?? '')
   const [assignments, setAssignments] = useState<Record<string, string>>({})
+  const [slotCount, setSlotCount] = useState(MIN_INPUTS)
   const [saving, setSaving] = useState(false)
 
-  // Reset assignments when template changes
-  useEffect(() => { setAssignments({}) }, [templateId])
+  // Auto-select first template if none selected yet (e.g. templates loaded after mount)
+  useEffect(() => {
+    if (!templateId && templates.length > 0) setTemplateId(templates[0].id)
+  }, [templates, templateId])
+
+  // Reset slots and assignments when template changes
+  useEffect(() => { setAssignments({}); setSlotCount(MIN_INPUTS) }, [templateId])
 
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? null
 
@@ -152,22 +185,11 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
     if (!name.trim()) return
     setSaving(true)
     try {
-      // 1. Create the production
       const prod = await productionsApi.create({ name: name.trim() })
-
-      // 2. Set template
-      if (templateId) {
-        await productionsApi.update(prod.id, { templateId })
+      if (templateId) await productionsApi.update(prod.id, { templateId })
+      for (const [pad, sourceId] of Object.entries(assignments)) {
+        if (sourceId) await productionsApi.assignSource(prod.id, { mixerInput: pad, sourceId })
       }
-
-      // 3. Assign sources
-      for (const [mixerInput, sourceId] of Object.entries(assignments)) {
-        if (sourceId) {
-          await productionsApi.assignSource(prod.id, { mixerInput, sourceId })
-        }
-      }
-
-      // 4. Sync store
       await fetchAll()
       onCreated()
     } finally {
@@ -176,7 +198,6 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
   }
 
   const assignedCount = Object.values(assignments).filter(Boolean).length
-  const totalSlots = selectedTemplate?.inputs.length ?? 0
 
   return (
     <Modal open title="New Production" onClose={onClose} className="max-w-xl">
@@ -216,16 +237,12 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
           )}
         </div>
 
-        {/* Source assignment slots — only shown when a template is selected */}
-        {selectedTemplate && selectedTemplate.inputs.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between border-t border-[--color-border] pt-3">
-              <span className="text-xs uppercase tracking-wider text-[--color-text-muted]">
-                Assign Sources
-              </span>
-              <span className={`text-xs font-mono ${assignedCount === totalSlots ? 'text-green-400' : 'text-[--color-text-muted]'}`}>
-                {assignedCount}/{totalSlots}
-              </span>
+        {/* Source inputs — shown when a template is selected */}
+        {selectedTemplate && (
+          <div className="flex flex-col gap-2 border-t border-[--color-border] pt-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs uppercase tracking-wider text-[--color-text-muted]">Assign Sources</span>
+              <span className="text-xs font-mono text-[--color-text-muted]">{assignedCount} assigned</span>
             </div>
 
             {sources.length === 0 ? (
@@ -233,22 +250,34 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
                 No sources available. Add sources in the Sources tab first.
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 pb-1 border-b border-[--color-border]">
-                  <span className="text-xs text-[--color-text-muted] w-28 shrink-0">Input slot</span>
-                  <span className="text-xs text-[--color-text-muted]">Source</span>
+              <>
+                <div className="flex flex-col gap-2">
+                  {Array.from({ length: slotCount }, (_, i) => (
+                    <SlotRow
+                      key={i}
+                      index={i}
+                      currentSourceId={assignments[mixerInput(i)] ?? ''}
+                      canRemove={slotCount > MIN_INPUTS}
+                      onChange={(sourceId) =>
+                        setAssignments((prev) => ({ ...prev, [mixerInput(i)]: sourceId }))
+                      }
+                      onRemove={() => {
+                        setAssignments((prev) => { const n = { ...prev }; delete n[mixerInput(i)]; return n })
+                        setSlotCount((c) => c - 1)
+                      }}
+                    />
+                  ))}
                 </div>
-                {selectedTemplate.inputs.map((slot) => (
-                  <SlotRow
-                    key={slot.id}
-                    slotId={slot.id}
-                    currentSourceId={assignments[slot.id] ?? ''}
-                    onChange={(sourceId) =>
-                      setAssignments((prev) => ({ ...prev, [slot.id]: sourceId }))
-                    }
-                  />
-                ))}
-              </div>
+                {slotCount < MAX_INPUTS && (
+                  <button
+                    type="button"
+                    onClick={() => setSlotCount((c) => c + 1)}
+                    className="text-xs text-[--color-accent] hover:opacity-80 text-left transition-opacity mt-1"
+                  >
+                    + Add Input
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -311,7 +340,6 @@ export function ProductionsPanel() {
           const isActivating = prod.status === 'activating'
           const template = templates.find((t) => t.id === prod.templateId)
           const assignedCount = prod.sources.length
-          const totalSlots = template?.inputs.length ?? 0
 
           return (
             <div
@@ -335,8 +363,8 @@ export function ProductionsPanel() {
                   {template ? (
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs text-[--color-text-muted] truncate">{template.name}</span>
-                      <span className={`text-xs font-mono ${assignedCount === totalSlots && totalSlots > 0 ? 'text-green-400' : 'text-[--color-text-muted]'}`}>
-                        {assignedCount}/{totalSlots} sources
+                      <span className="text-xs font-mono text-[--color-text-muted]">
+                        {assignedCount} {assignedCount === 1 ? 'source' : 'sources'}
                       </span>
                     </div>
                   ) : (

@@ -13,7 +13,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export type StreamType = 'srt' | 'whip'
+export type StreamType = 'srt' | 'efp' | 'whip' | 'test1' | 'test2'
 
 export interface ApiSource {
   id: string
@@ -48,11 +48,7 @@ export interface ApiTemplate {
     blocks: unknown[]
     links: unknown[]
   }
-  inputs: Array<{
-    id: string
-    blockId: string
-    addressProperty: string
-  }>
+  inputs: Array<{ id: string }>
   createdAt: string
   updatedAt: string
 }

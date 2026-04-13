@@ -26,7 +26,7 @@ export function Modal({ open, title, onClose, children, className }: ModalProps)
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div
         className={cn(
-          'bg-[--color-surface-raised] border border-[--color-border-strong] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.4)] w-full max-w-lg mx-4 p-6',
+          'bg-[#1e1e1e] border border-[var(--color-border-strong)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.4)] w-full max-w-lg mx-4 p-6',
           className,
         )}
         onClick={(e) => e.stopPropagation()}
