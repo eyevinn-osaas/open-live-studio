@@ -28,7 +28,7 @@ const STREAM_TYPE_HAS_ADDRESS: Record<StreamType, boolean> = {
   test2: false,
 }
 
-const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'whip']
+const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp']
 
 export function SourcesPanel() {
   const { sources, isLoading, lastFetchedAt, removeSource, addSource } = useSourcesStore()
@@ -95,7 +95,7 @@ export function SourcesPanel() {
           </div>
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Stream Type</label>
-            <div className="grid grid-cols-3 gap-2" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+            <div className="grid grid-cols-2 gap-2">
               {CREATABLE_STREAM_TYPES.map((t) => (
                 <button
                   key={t}
