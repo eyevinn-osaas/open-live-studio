@@ -1,14 +1,19 @@
 // Runtime env injection: docker-entrypoint.sh writes /env-config.js which sets
-// window._env_.VITE_API_URL so the backend URL can be changed without rebuilding
+// window._env_.OPEN_LIVE_URL so the backend URL can be changed without rebuilding
 // the image (required for OSC parameter store injection).
 const BASE =
-  (typeof window !== 'undefined' && (window as unknown as { _env_?: { VITE_API_URL?: string } })._env_?.VITE_API_URL) ||
-  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' && (window as unknown as { _env_?: { OPEN_LIVE_URL?: string } })._env_?.OPEN_LIVE_URL) ||
+  import.meta.env.OPEN_LIVE_URL ||
   'http://localhost:3000'
 
+import { getApiToken } from './sat.js'
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getApiToken()
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
     ...init,
   })
   if (!res.ok) {
