@@ -1,11 +1,6 @@
 #!/bin/bash
 set -e
 
-# === OSC Public URL Configuration ===
-if [ -n "$OSC_HOSTNAME" ]; then
-  export OPEN_LIVE_URL="https://$OSC_HOSTNAME"
-fi
-
 # === Default PORT for OSC ===
 export PORT="${PORT:-8080}"
 
