@@ -50,7 +50,8 @@ function SlotRow({ index, currentSourceId, canRemove, onChange, onRemove }: Slot
             {s.name} ({s.streamType.toUpperCase()})
           </option>
         ))}
-        <optgroup label="Test Streams">
+        <optgroup label="Virtual Sources">
+          <option value="Whip">WHIP Input</option>
           <option value="__test1__">Pinwheel</option>
           <option value="__test2__">Colors</option>
         </optgroup>
@@ -429,6 +430,15 @@ export function ProductionsPanel() {
                   ))}
                 </div>
               )}
+
+              {/* WHIP ingest endpoints — shown only when active */}
+              {isActive && prod.whipEndpoints && prod.whipEndpoints.length > 0 && (
+                <div className="flex flex-col gap-1 pl-6 pt-1 border-t border-[--color-border]">
+                  {prod.whipEndpoints.map((ep) => (
+                    <WhipEndpointRow key={ep.mixerInput} mixerInput={ep.mixerInput} url={ep.url} />
+                  ))}
+                </div>
+              )}
             </div>
           )
         })}
@@ -459,8 +469,38 @@ export function ProductionsPanel() {
 // ---------------------------------------------------------------------------
 
 const VIRTUAL_SOURCE_NAMES: Record<string, string> = {
+  'Whip': 'WHIP',
   '__test1__': 'Pinwheel',
   '__test2__': 'Colors',
+}
+
+function WhipEndpointRow({ mixerInput, url }: { mixerInput: string; url: string }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] text-[--color-text-muted] uppercase shrink-0">
+        WHIP
+      </span>
+      <span className="text-xs font-mono text-[--color-text-muted] shrink-0">{mixerInput}</span>
+      <span className="text-xs font-mono text-[--color-text-primary] truncate flex-1">{url}</span>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="text-xs text-[--color-text-muted] hover:text-[--color-text-primary] transition-colors shrink-0"
+        title="Copy WHIP endpoint URL"
+      >
+        {copied ? '✓' : '⎘'}
+      </button>
+    </div>
+  )
 }
 
 function SourceAssignmentBadge({ assignment }: { assignment: { sourceId: string; mixerInput: string } }) {

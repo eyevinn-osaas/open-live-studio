@@ -16,6 +16,7 @@ export interface Production {
   templateId?: string
   stromFlowId?: string
   whepEndpoint?: string
+  whipEndpoints?: Array<{ mixerInput: string; url: string }>
 }
 
 interface ProductionsState {
@@ -43,6 +44,7 @@ function fromApi(p: ApiProduction): Production {
     templateId: p.templateId,
     stromFlowId: p.stromFlowId,
     whepEndpoint: p.whepEndpoint,
+    whipEndpoints: p.whipEndpoints,
   }
 }
 
@@ -109,6 +111,7 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
                   prod.status = polled.status
                   prod.stromFlowId = polled.stromFlowId
                   prod.whepEndpoint = polled.whepEndpoint
+                  prod.whipEndpoints = polled.whipEndpoints
                 }
               })
               if (polled.status === 'activating') {
