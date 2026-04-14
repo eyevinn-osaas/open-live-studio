@@ -11,9 +11,10 @@ import { getApiToken } from './sat.js'
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await getApiToken()
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+  const contentHeaders: Record<string, string> = init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}
 
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    headers: { ...contentHeaders, ...authHeaders },
     ...init,
   })
   if (!res.ok) {
@@ -48,6 +49,7 @@ export interface ApiProduction {
   templateId?: string
   stromFlowId?: string
   whepEndpoint?: string
+  whipEndpoints?: Array<{ mixerInput: string; url: string }>
 }
 
 export interface ApiTemplate {
@@ -72,6 +74,7 @@ type RawProduction = {
   templateId?: string
   stromFlowId?: string
   whepEndpoint?: string
+  whipEndpoints?: Array<{ mixerInput: string; url: string }>
 }
 
 function normalizeProduction(d: RawProduction): ApiProduction {
@@ -83,6 +86,7 @@ function normalizeProduction(d: RawProduction): ApiProduction {
     templateId: d.templateId,
     stromFlowId: d.stromFlowId,
     whepEndpoint: d.whepEndpoint,
+    whipEndpoints: d.whipEndpoints,
   }
 }
 
