@@ -1,10 +1,15 @@
 import { NavLink } from 'react-router'
 import { cn } from '@/lib/cn'
 import { useProductionStore } from '@/store/production.store'
+import { ConnectionStatus } from '@/components/ui/ConnectionStatus'
 
 const NAV_ITEMS = [
-  { to: '/setup',      label: 'Setup',      icon: '⚙' },
-  { to: '/controller', label: 'Controller', icon: '🎬' },
+  { to: '/setup',         label: 'Setup',    icon: '⚙' },
+  { to: '/controller',    label: 'Control',  icon: '🎬' },
+  { to: '/audio/console', label: 'Console',  icon: '🎚' },
+  { to: '/audio/grid',    label: 'Grid',     icon: '🎛' },
+  { to: '/audio/monitor', label: 'Monitor',  icon: '📊' },
+  { to: '/audio/eyevinn', label: 'Eyevinn',  icon: '🎙' },
 ]
 
 export function NavBar() {
@@ -39,18 +44,14 @@ export function NavBar() {
         ))}
       </div>
 
-      {/* ON AIR indicator */}
-      <div className="p-1.5 pb-3">
-        <div
-          className={cn(
-            'w-full py-1.5 rounded text-[9px] font-mono font-bold text-center uppercase tracking-widest transition-all',
-            isLive
-              ? 'bg-[--color-live] text-white animate-pulse'
-              : 'bg-[--color-surface-raised] text-[--color-text-muted] border border-[--color-border]',
-          )}
-        >
-          {isLive ? 'ON AIR' : 'OFF AIR'}
-        </div>
+      {/* Bottom: ON AIR when live, connection status always */}
+      <div className="p-1.5 pb-5 flex flex-col gap-2">
+        {isLive && (
+          <div className="w-full py-1.5 rounded text-[9px] font-mono font-bold text-center uppercase tracking-widest bg-[--color-live] text-white animate-pulse">
+            ON AIR
+          </div>
+        )}
+        <ConnectionStatus />
       </div>
     </nav>
   )

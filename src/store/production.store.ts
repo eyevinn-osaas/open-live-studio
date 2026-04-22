@@ -15,6 +15,8 @@ interface ProductionState {
   transitionDurationMs: number
   tBarPosition: number // 0.0–1.0
   activeProductionId: string | null
+  /** Server-confirmed DSK layer visibility: layer index → visible */
+  dskState: Record<number, boolean>
 }
 
 interface ProductionActions {
@@ -28,6 +30,7 @@ interface ProductionActions {
   setTBarPosition: (pos: number) => void
   setLive: (live: boolean) => void
   setActiveProduction: (id: string | null) => void
+  setDskState: (layer: number, visible: boolean) => void
 }
 
 export const useProductionStore = create<ProductionState & ProductionActions>()(
@@ -42,6 +45,7 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       transitionDurationMs: 1000,
       tBarPosition: 1,
       activeProductionId: null,
+      dskState: {},
 
       // Actions
       cut: () =>
@@ -98,6 +102,12 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       setActiveProduction: (id) =>
         set((state) => {
           state.activeProductionId = id
+          state.dskState = {}
+        }),
+
+      setDskState: (layer, visible) =>
+        set((state) => {
+          state.dskState[layer] = visible
         }),
     })),
     { name: 'production' },

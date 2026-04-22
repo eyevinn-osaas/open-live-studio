@@ -2,13 +2,19 @@ import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { SourcesPanel } from './SourcesPanel'
 import { ProductionsPanel } from './ProductionsPanel'
+import { ConfigsPanel } from './ConfigsPanel'
+import { GraphicsPanel } from './GraphicsPanel'
+import { OutputsPanel } from './OutputsPanel'
 import { cn } from '@/lib/cn'
 
-type Tab = 'sources' | 'productions'
+type Tab = 'productions' | 'sources' | 'graphics' | 'outputs' | 'configs'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'productions', label: 'Productions' },
   { id: 'sources', label: 'Sources' },
+  { id: 'graphics', label: 'Graphics' },
+  { id: 'outputs', label: 'Outputs' },
+  { id: 'configs', label: 'Configs' },
 ]
 
 export function SetupPage() {
@@ -41,8 +47,11 @@ export function SetupPage() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-auto p-5">
-        {activeTab === 'sources' && <SourcesPanel />}
         {activeTab === 'productions' && <ProductionsPanel />}
+        {activeTab === 'sources' && <SourcesPanel />}
+        {activeTab === 'graphics' && <GraphicsPanel />}
+        {activeTab === 'outputs' && <OutputsPanel />}
+        {activeTab === 'configs' && <ConfigsPanel />}
       </div>
     </div>
   )

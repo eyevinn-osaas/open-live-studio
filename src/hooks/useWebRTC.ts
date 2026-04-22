@@ -21,6 +21,7 @@ const API_BASE =
 export function useWebRTC(whepEndpoint?: string | null): void {
   const setProgramStream = useViewerStore((s) => s.setProgramStream)
   const setConnectionState = useViewerStore((s) => s.setConnectionState)
+  const setRetryCountdown = useViewerStore((s) => s.setRetryCountdown)
   const disconnect = useViewerStore((s) => s.disconnect)
   const clientRef = useRef<WhepClient | null>(null)
   const [authToken, setAuthToken] = useState<string | undefined>(undefined)
@@ -31,8 +32,26 @@ export function useWebRTC(whepEndpoint?: string | null): void {
 
   useEffect(() => {
     let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let countdownTimer: ReturnType<typeof setInterval> | null = null
 
-    if (whepEndpoint) {
+    const startCountdown = (seconds: number, onDone: () => void) => {
+      setRetryCountdown(seconds)
+      let remaining = seconds - 1
+      countdownTimer = setInterval(() => {
+        if (cancelled) { clearInterval(countdownTimer!); return }
+        if (remaining <= 0) {
+          clearInterval(countdownTimer!)
+          setRetryCountdown(null)
+          onDone()
+        } else {
+          setRetryCountdown(remaining--)
+        }
+      }, 1000)
+    }
+
+    const connect = () => {
+      if (cancelled || !whepEndpoint) return
       setConnectionState('connecting')
       const client = new WhepClient(whepEndpoint, {
         onVideoTrack: (stream) => {
@@ -45,17 +64,27 @@ export function useWebRTC(whepEndpoint?: string | null): void {
           if (!cancelled) setConnectionState('disconnected')
         },
         onError: () => {
-          if (!cancelled) setConnectionState('error')
+          if (!cancelled) {
+            setConnectionState('error')
+            startCountdown(3, connect)
+          }
         },
       }, { iceServersUrl: `${API_BASE}/api/v1/ice-servers`, proxyUrl: `${API_BASE}/api/v1/whep-proxy`, authToken })
       clientRef.current = client
       void client.connect()
+    }
+
+    if (whepEndpoint) {
+      connect()
     } else {
       disconnect()
     }
 
     return () => {
       cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+      if (countdownTimer) clearInterval(countdownTimer)
+      setRetryCountdown(null)
       if (clientRef.current) {
         void clientRef.current.disconnect()
         clientRef.current = null
@@ -63,5 +92,5 @@ export function useWebRTC(whepEndpoint?: string | null): void {
         disconnect()
       }
     }
-  }, [whepEndpoint, authToken, setProgramStream, setConnectionState, disconnect])
+  }, [whepEndpoint, authToken, setProgramStream, setConnectionState, setRetryCountdown, disconnect])
 }

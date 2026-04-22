@@ -1,31 +1,40 @@
 import { useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router'
 import { useWebRTC } from '@/hooks/useWebRTC'
 import { useControllerWs } from '@/hooks/useControllerWs'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { ProgramPreview } from './ProgramPreview'
 import { TransitionPanel } from './TransitionPanel'
-import { GraphicsPanel } from './GraphicsPanel'
 import { DskPanel } from './DskPanel'
 import { MacroBar } from './MacroBar'
+import { AudioPanel } from './AudioPanel'
 import { TimerBar } from './TimerBar'
 import { StreamingStatus } from './StreamingStatus'
 import { useProductionStore } from '@/store/production.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { useStatsStore } from '@/store/stats.store'
-
+import { useAudioStore } from '@/store/audio.store'
+import { audioApi } from '@/lib/api'
 export function ControllerPage() {
   const { isLive, setLive, cut, auto, ftb, setPvw, pvwInput, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
+  const activeProduction = useProductionsStore((s) => s.productions.find((p) => p.id === activeProductionId))
   const whepEndpoint = useProductionsStore(
     (s) => s.productions.find((p) => p.id === activeProductionId)?.whepEndpoint,
   )
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
+    const paramId = searchParams.get('production')
+    if (paramId) {
+      if (paramId !== activeProductionId) setActiveProduction(paramId)
+      return
+    }
     if (activeProductionId) return
     const active = [...productions].reverse().find((p) => p.status === 'active')
     if (active) setActiveProduction(active.id)
-  }, [productions, activeProductionId, setActiveProduction])
+  }, [productions, activeProductionId, setActiveProduction, searchParams])
   useWebRTC(whepEndpoint)
   const send = useControllerWs(activeProductionId)
   const startPolling = useStatsStore((s) => s.startPolling)
@@ -39,6 +48,15 @@ export function ControllerPage() {
     }
     return () => stopPolling()
   }, [activeProductionId, startPolling, stopPolling])
+
+  const setElements = useAudioStore((s) => s.setElements)
+
+  useEffect(() => {
+    if (!activeProductionId || activeProduction?.status !== 'active') return
+    void audioApi.discoverElements(activeProductionId).then((elements) => {
+      if (elements.length > 0) setElements(elements, activeProductionId)
+    }).catch(() => {})
+  }, [activeProductionId, activeProduction?.status, setElements])
 
   const handleCut = useCallback(() => {
     cut()
@@ -84,7 +102,7 @@ export function ControllerPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       <PageHeader
         title={
           <div className="relative inline-flex items-center">
@@ -113,25 +131,31 @@ export function ControllerPage() {
               variant={isLive ? 'pgm' : 'default'}
               size="md"
               onClick={handleGoLive}
+              disabled={activeProduction?.status === 'activating'}
             >
-              {isLive ? '● ON AIR' : '○ Go Live'}
+              {activeProduction?.status === 'activating' ? '◌ Starting...' : isLive ? '● ON AIR' : '○ Go Live'}
             </Button>
           </div>
         }
       />
 
-      {/* Player above, controls below — full scroll */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="px-4 pt-4">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {/* Player — fills remaining space above controls */}
+        <div className="flex-1 min-h-0 px-4 pt-4 flex items-center justify-center overflow-hidden">
           <ProgramPreview />
         </div>
-        <div className="px-4 pb-4 pt-3 flex flex-col gap-3">
-          <TransitionPanel onCut={handleCut} onAuto={handleAuto} onFtb={handleFtb} onSelectPvw={handleSelectPvw} onSetOvl={handleSetOvl} />
-          {activeProductionId && (
-            <MacroBar productionId={activeProductionId} onExec={handleMacroExec} />
-          )}
-          <DskPanel onToggle={handleDskToggle} />
-          <GraphicsPanel />
+        {/* Controls + audio — side by side below player */}
+        <div className="flex-none flex pt-3 pb-4">
+          <div className="w-[70%] px-4 flex flex-col gap-3">
+            <TransitionPanel onCut={handleCut} onAuto={handleAuto} onFtb={handleFtb} onSelectPvw={handleSelectPvw} onSetOvl={handleSetOvl} />
+            <DskPanel onToggle={handleDskToggle} />
+            {false && activeProductionId && (
+              <MacroBar productionId={activeProductionId} onExec={handleMacroExec} />
+            )}
+          </div>
+          <div className="w-[30%] pr-4">
+            <AudioPanel send={send} />
+          </div>
         </div>
       </div>
     </div>

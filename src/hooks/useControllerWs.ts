@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useProductionStore } from '@/store/production.store'
+import { useAudioStore } from '@/store/audio.store'
 
 const WS_BASE = (
   (typeof window !== 'undefined' && (window as unknown as { _env_?: { OPEN_LIVE_URL?: string } })._env_?.OPEN_LIVE_URL) ||
@@ -7,7 +8,7 @@ const WS_BASE = (
   'http://localhost:3000'
 ).replace(/^http/, 'ws')
 
-type OutboundMessage =
+export type OutboundMessage =
   | { type: 'CUT'; mixerInput: string }
   | { type: 'TRANSITION'; mixerInput: string; transitionType: string; durationMs?: number }
   | { type: 'TAKE' }
@@ -20,6 +21,7 @@ type OutboundMessage =
   | { type: 'GRAPHIC_OFF'; overlayId: string }
   | { type: 'DSK_TOGGLE'; layer: number; visible?: boolean }
   | { type: 'MACRO_EXEC'; macroId: string }
+  | { type: 'AUDIO_SET'; elementId: string; property: 'volume' | 'mute'; value: number | boolean }
 
 /**
  * Opens a WebSocket connection to /ws/productions/:id/controller.
@@ -32,6 +34,10 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
   const setPvw = useProductionStore((s) => s.setPvw)
   const setLive = useProductionStore((s) => s.setLive)
   const setTBarPosition = useProductionStore((s) => s.setTBarPosition)
+  const setDskState = useProductionStore((s) => s.setDskState)
+  const applyLevel = useAudioStore((s) => s.applyLevel)
+  const applyMuted = useAudioStore((s) => s.applyMuted)
+  const applyMeter = useAudioStore((s) => s.applyMeter)
 
   useEffect(() => {
     if (!productionId) return
@@ -59,6 +65,25 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
           case 'ON_AIR':
             setLive(!!msg['value'])
             break
+          case 'DSK_STATE':
+            if (typeof msg['layer'] === 'number' && typeof msg['visible'] === 'boolean') {
+              setDskState(msg['layer'] as number, msg['visible'] as boolean)
+            }
+            break
+          case 'AUDIO_STATE':
+            if (typeof msg['elementId'] === 'string') {
+              if (msg['property'] === 'volume' && typeof msg['value'] === 'number') {
+                applyLevel(msg['elementId'] as string, msg['value'] as number)
+              } else if (msg['property'] === 'mute' && typeof msg['value'] === 'boolean') {
+                applyMuted(msg['elementId'] as string, msg['value'] as boolean)
+              }
+            }
+            break
+          case 'METER_DATA':
+            if (typeof msg['elementId'] === 'string' && Array.isArray(msg['peak']) && Array.isArray(msg['rms'])) {
+              applyMeter(msg['elementId'] as string, msg['peak'] as number[], msg['rms'] as number[])
+            }
+            break
         }
       } catch {
         // ignore malformed frames
@@ -73,7 +98,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
       ws.close()
       wsRef.current = null
     }
-  }, [productionId, setPgm, setPvw, setLive, setTBarPosition])
+  }, [productionId, setPgm, setPvw, setLive, setTBarPosition, setDskState, applyLevel, applyMuted, applyMeter])
 
   const send = useCallback((msg: OutboundMessage) => {
     const ws = wsRef.current

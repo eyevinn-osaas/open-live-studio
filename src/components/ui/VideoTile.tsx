@@ -66,7 +66,7 @@ export function VideoTile({
       {/* Video element — playsinline required for iOS Safari */}
       <video
         ref={videoRef}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-contain"
         playsInline
         autoPlay
         muted

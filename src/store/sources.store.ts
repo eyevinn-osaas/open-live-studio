@@ -13,6 +13,7 @@ export interface Source {
   status: SourceStatus
   color: string
   liveCamera?: boolean
+  latency?: number
 }
 
 interface SourcesState {
@@ -40,6 +41,7 @@ function fromApi(s: ApiSource): Source {
     status: s.status,
     color: SOURCE_COLOR,
     liveCamera: s.liveCamera,
+    latency: s.latency,
   }
 }
 

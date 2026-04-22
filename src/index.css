@@ -57,6 +57,68 @@ input[type="range"] {
   accent-color: var(--color-accent);
 }
 
+/* Vertical channel fader — horizontal input rotated -90deg to avoid writing-mode axis-swap */
+.fader-rotated {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  outline: none;
+  position: absolute;
+  transform: rotate(-90deg);
+  transform-origin: center center;
+}
+.fader-rotated::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #3f3f46;
+  border-radius: 2px;
+}
+.fader-rotated::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 42px;
+  margin-top: -19px;
+  background: linear-gradient(
+    to left,
+    #cecece 0%,
+    #b0b0b0 38%,
+    #686868 45%,
+    #686868 55%,
+    #b0b0b0 62%,
+    #909090 100%
+  );
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.25);
+  cursor: pointer;
+}
+.fader-rotated:disabled::-webkit-slider-thumb {
+  background: #3f3f46;
+  border-color: #52525b;
+  cursor: not-allowed;
+}
+.fader-rotated::-moz-range-track {
+  height: 4px;
+  background: #3f3f46;
+  border-radius: 2px;
+}
+.fader-rotated::-moz-range-thumb {
+  width: 18px;
+  height: 42px;
+  background: linear-gradient(
+    to left,
+    #cecece 0%,
+    #b0b0b0 38%,
+    #686868 45%,
+    #686868 55%,
+    #b0b0b0 62%,
+    #909090 100%
+  );
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--color-surface-2); }
