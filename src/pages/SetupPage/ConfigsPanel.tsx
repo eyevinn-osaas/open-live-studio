@@ -186,7 +186,7 @@ export function ConfigsPanel() {
             {cfgs.map((cfg) => (
               <div
                 key={cfg._id}
-                className="flex items-center gap-3 px-4 py-3 rounded bg-[--color-surface-3] border border-[--color-border] hover:border-zinc-600 transition-colors"
+                className="flex items-center gap-3 px-4 py-3 rounded bg-[--color-surface-3] border border-[--color-border] hover:border-orange-500 transition-colors cursor-pointer"
               >
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-[--color-text-primary] truncate block">{cfg.name}</span>

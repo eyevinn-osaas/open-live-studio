@@ -854,8 +854,8 @@ export function ProductionsPanel() {
               key={prod.id}
               className={`flex items-center gap-3 px-4 py-3 rounded border transition-colors ${
                 isActive
-                  ? 'bg-[--color-surface-3] border-[--color-accent]'
-                  : 'bg-[--color-surface-3] border-[--color-border] hover:border-zinc-600'
+                  ? 'bg-[--color-surface-3] border-[--color-accent] hover:border-zinc-600 cursor-not-allowed'
+                  : 'bg-[--color-surface-3] border-[--color-border] hover:border-orange-500 cursor-pointer'
               }`}
             >
               <StatusDot
