@@ -21,6 +21,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
     if (ovlTimerRef.current) clearTimeout(ovlTimerRef.current)
     ovlTimerRef.current = setTimeout(() => onSetOvl(alpha), 150)
   }, [onSetOvl])
+
   const {
     pgmInput, pvwInput, isFtb,
     transitionType, transitionDurationMs, tBarPosition,
@@ -32,8 +33,8 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
   const sources = useSourcesStore((s) => s.sources)
 
   const VIRTUAL_SOURCE_NAMES: Record<string, string> = {
-    '__test1__': 'Pinwheel',
-    '__test2__': 'Colors',
+    '__test1__': 'PINWHEEL',
+    '__test2__': 'COLORS',
   }
 
   // One slot per assignment, sorted by mixer input — handles duplicates and virtual sources
@@ -41,62 +42,67 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
     .sort((a, b) => a.mixerInput.localeCompare(b.mixerInput))
     .map((a) => {
       const realSource = sources.find((s) => s.id === a.sourceId)
-      const name = realSource?.name ?? VIRTUAL_SOURCE_NAMES[a.sourceId] ?? a.sourceId
+      const name = (realSource?.name ?? VIRTUAL_SOURCE_NAMES[a.sourceId] ?? a.sourceId).toUpperCase()
       return { mixerInput: a.mixerInput, sourceId: a.sourceId, name }
     })
 
-  const labelClass = 'flex items-center justify-center w-10 shrink-0 text-[10px] font-mono font-bold uppercase tracking-widest'
-  const rowClass = 'flex items-center gap-1 flex-1 overflow-x-auto px-2 py-2'
-  const actionGroupClass = 'flex items-center gap-1 px-2 py-2 shrink-0 border-l border-[--color-border] w-56'
-
   return (
-    <div className="bg-[--color-surface-3] rounded-xl border border-[--color-border] overflow-hidden">
+    <div className="border border-zinc-800 bg-zinc-950 overflow-hidden">
 
-      {/* PGM row */}
-      <div className="flex items-stretch border-b border-[--color-border]">
-        <div className={cn(labelClass, 'text-[--color-pgm] bg-[--color-pgm]/10 border-r border-[--color-border]')}>
-          PGM
+      {/* ── PGM row ──────────────────────────────────────────────────────────── */}
+      <div className="flex items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
+        {/* Row label */}
+        <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800"
+          style={{ width: 40, background: 'rgba(255,0,0,0.12)' }}>
+          <span className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: '#ff0000' }}>PGM</span>
         </div>
-        <div className={rowClass}>
+
+        {/* Source tiles */}
+        <div className="flex items-center gap-px flex-1 overflow-x-auto px-1.5 py-1">
           {inputSlots.length === 0 && (
-            <span className="text-[10px] text-[--color-text-muted] italic">
-              {!production?.templateId ? 'No template assigned' : 'No sources available'}
+            <span className="text-[9px] text-zinc-600 italic px-1">
+              {!production?.templateId ? 'NO TEMPLATE' : 'NO SOURCES'}
             </span>
           )}
           {inputSlots.map((slot) => (
             <div
               key={slot.mixerInput}
               className={cn(
-                'flex-1 min-w-16 py-1.5 px-2 rounded text-xs font-bold truncate border cursor-default select-none flex items-center justify-center',
+                'flex-1 min-w-14 py-1 px-1.5 text-[10px] font-bold truncate border cursor-default select-none flex items-center justify-center tracking-wide',
                 pgmInput === slot.mixerInput
-                  ? 'bg-red-600 border-white text-white'
-                  : 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted]',
+                  ? 'text-white border-white'
+                  : 'text-zinc-600 border-zinc-800 bg-zinc-900',
               )}
+              style={pgmInput === slot.mixerInput ? { background: '#ff0000', borderColor: '#ffffff' } : {}}
             >
               {slot.name}
             </div>
           ))}
         </div>
-        <div className={actionGroupClass}>
+
+        {/* Action group: TAKE + AUTO + FTB */}
+        <div className="flex items-center gap-px px-1.5 shrink-0 border-l border-zinc-800 py-1">
+          {/* TAKE — large physical button */}
           <button
             onClick={onCut}
-            className="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest bg-red-600 border border-white text-white hover:opacity-90 transition-opacity"
+            className="btn-hardware px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white border ring-1 ring-inset ring-white transition-opacity hover:opacity-90"
+            style={{ background: '#cc0000', borderColor: '#ff0000', minWidth: 64 }}
           >
             TAKE
           </button>
           <button
             onClick={onAuto}
-            className="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest bg-[--color-surface-raised] border border-[--color-border-strong] text-[--color-text-primary] hover:bg-[--color-surface-1] transition-colors"
+            className="btn-hardware px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-300 bg-zinc-800 border border-zinc-600 hover:bg-zinc-700 transition-colors"
           >
             AUTO
           </button>
           <button
             onClick={onFtb}
             className={cn(
-              'px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest border transition-colors',
+              'btn-hardware px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors',
               isFtb
-                ? 'bg-zinc-900 border-zinc-600 text-white'
-                : 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted] hover:text-[--color-text-primary]',
+                ? 'text-white border-zinc-400 bg-zinc-700'
+                : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-300',
             )}
           >
             FTB
@@ -104,15 +110,19 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
         </div>
       </div>
 
-      {/* PVW row */}
-      <div className="flex items-stretch border-b border-[--color-border]">
-        <div className={cn(labelClass, 'text-[--color-pvw] bg-[--color-pvw]/10 border-r border-[--color-border]')}>
-          PVW
+      {/* ── PVW row ──────────────────────────────────────────────────────────── */}
+      <div className="flex items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
+        {/* Row label */}
+        <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800"
+          style={{ width: 40, background: 'rgba(0,204,0,0.10)' }}>
+          <span className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: '#00cc00' }}>PVW</span>
         </div>
-        <div className={rowClass}>
+
+        {/* Source tiles */}
+        <div className="flex items-center gap-px flex-1 overflow-x-auto px-1.5 py-1">
           {inputSlots.length === 0 && (
-            <span className="text-[10px] text-[--color-text-muted] italic">
-              {!production?.templateId ? 'No template assigned' : 'No sources available'}
+            <span className="text-[9px] text-zinc-600 italic px-1">
+              {!production?.templateId ? 'NO TEMPLATE' : 'NO SOURCES'}
             </span>
           )}
           {inputSlots.map((slot) => {
@@ -124,68 +134,104 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
                 onClick={() => !isOnPgm && onSelectPvw(slot.mixerInput)}
                 disabled={isOnPgm}
                 className={cn(
-                  'flex-1 min-w-16 py-1.5 px-2 rounded text-xs font-bold truncate transition-all border',
+                  'btn-hardware flex-1 min-w-14 py-1 px-1.5 text-[10px] font-bold truncate border transition-all tracking-wide',
                   isActive
-                    ? 'bg-green-600 border-white text-white'
+                    ? 'text-black border-white'
                     : isOnPgm
-                      ? 'bg-[--color-surface] border-[--color-border] text-[--color-text-muted] opacity-40 cursor-default'
-                      : 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted] hover:text-[--color-text-primary] hover:border-[--color-pvw]/50',
+                      ? 'text-zinc-700 bg-zinc-900 border-zinc-800 opacity-40 cursor-not-allowed'
+                      : 'text-zinc-500 bg-zinc-900 border-zinc-800 hover:text-white hover:border-zinc-500',
                 )}
+                style={isActive ? { background: '#00cc00', borderColor: '#ffffff' } : {}}
               >
                 {slot.name}
               </button>
             )
           })}
         </div>
-        <div className={actionGroupClass}>
-          {TRANSITION_TYPES.map((type) => (
+
+        {/* Transition type selector — 3-button hardware bus strip */}
+        <div className="flex items-center shrink-0 border-l border-zinc-800 px-1.5 py-1 gap-0">
+          {TRANSITION_TYPES.map((type, idx) => (
             <button
               key={type}
               onClick={() => setTransitionType(type)}
               className={cn(
-                'px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest border transition-colors',
+                'btn-hardware px-0 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors',
+                idx === 0 ? 'border-r-0' : idx === TRANSITION_TYPES.length - 1 ? 'border-l-0' : 'border-x-0',
                 transitionType === type
-                  ? 'bg-sky-400 border-sky-400 text-zinc-900'
-                  : 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted] hover:text-[--color-text-primary]',
+                  ? 'text-black bg-orange-500 border-orange-400 z-10 relative'
+                  : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-300 hover:bg-zinc-800',
               )}
+              style={{ minWidth: 52 }}
             >
-              {type}
+              {type.toUpperCase()}
             </button>
           ))}
         </div>
       </div>
 
-      {/* OVL / T-bar row */}
+      {/* ── OVL / T-bar row ─────────────────────────────────────────────────── */}
       <div className="flex items-stretch">
-        <div className={cn(labelClass, 'text-[--color-text-muted] border-r border-[--color-border]')}>
-          OVL
+        {/* Row label */}
+        <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800" style={{ width: 40 }}>
+          <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-600">OVL</span>
         </div>
-        <div className="flex items-center gap-3 flex-1 px-3 py-2">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round(tBarPosition * 100)}
-            onChange={(e) => { const v = Number(e.target.value) / 100; setTBarPosition(v); debouncedSetOvl(v) }}
-            className="flex-1 h-1.5"
-          />
-          <span className="text-xs font-mono text-[--color-text-muted] w-8 text-right tabular-nums">
+
+        {/* T-bar slider — styled like a physical fader */}
+        <div className="flex items-center flex-1 px-3 py-2 gap-3">
+          <div className="relative flex-1 flex items-center" style={{ height: 24 }}>
+            {/* Track background */}
+            <div
+              className="absolute inset-x-0"
+              style={{
+                height: 4,
+                background: '#1a1a1a',
+                border: '1px solid #333333',
+                top: '50%',
+                transform: 'translateY(-50%)',
+              }}
+            />
+            {/* Fill */}
+            <div
+              className="absolute left-0"
+              style={{
+                height: 4,
+                width: `${tBarPosition * 100}%`,
+                background: '#f97316',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                transition: 'width 40ms linear',
+              }}
+            />
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(tBarPosition * 100)}
+              onChange={(e) => { const v = Number(e.target.value) / 100; setTBarPosition(v); debouncedSetOvl(v) }}
+              className="absolute inset-0 w-full opacity-0 cursor-pointer"
+              style={{ zIndex: 2 }}
+            />
+          </div>
+          <span className="text-[10px] font-mono text-zinc-500 w-10 text-right tabular-nums shrink-0">
             {tBarPosition.toFixed(2)}
           </span>
         </div>
-        <div className={cn(actionGroupClass, 'gap-1.5')}>
+
+        {/* Duration presets + custom ms input */}
+        <div className="flex items-center gap-px px-1.5 py-1 shrink-0 border-l border-zinc-800">
           {DURATION_PRESETS_MS.map((ms) => (
             <button
               key={ms}
               onClick={() => setTransitionDuration(ms)}
               className={cn(
-                'px-2.5 py-1 rounded text-[10px] font-mono border transition-colors',
+                'btn-hardware px-2.5 py-1.5 text-[9px] font-mono border transition-colors uppercase tracking-widest',
                 transitionDurationMs === ms
-                  ? 'bg-sky-400 border-sky-400 text-zinc-900'
-                  : 'bg-[--color-surface-raised] border-[--color-border-strong] text-[--color-text-muted] hover:text-[--color-text-primary]',
+                  ? 'text-black bg-orange-500 border-orange-400'
+                  : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-300',
               )}
             >
-              {ms / 1000}s
+              {ms / 1000}S
             </button>
           ))}
           <input
@@ -195,8 +241,10 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
             step={100}
             value={transitionDurationMs}
             onChange={(e) => setTransitionDuration(Number(e.target.value))}
-            className="w-[61px] px-2 py-1 rounded border border-[--color-border-strong] bg-[--color-surface-raised] text-[10px] font-mono text-[--color-text-primary] text-right focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+            className="w-[64px] px-2 py-1.5 border border-zinc-700 bg-zinc-900 text-[10px] font-mono text-zinc-300 text-right focus:outline-none focus:border-orange-500"
+            style={{ appearance: 'textfield' }}
           />
+          <span className="text-[9px] text-zinc-600 px-1 uppercase">MS</span>
         </div>
       </div>
 

@@ -4,22 +4,21 @@ import { useProductionStore } from '@/store/production.store'
 import { ConnectionStatus } from '@/components/ui/ConnectionStatus'
 
 function OpenLiveLogo() {
-  // Expanded viewBox (-2 -2 40 40) gives 2px breathing room so the circle stroke isn't clipped.
-  // Play triangle shifted 1px right for optical centering (play shapes read left-heavy).
-  // Red dot sits on the circumference at 45° top-right: (18+15.5·cos45°, 18−15.5·sin45°) ≈ (29,7).
   return (
-    <svg width="34" height="34" viewBox="-2 -2 40 40" fill="none" aria-label="Open Live">
-      <circle cx="18" cy="18" r="15.5" stroke="var(--color-accent)" strokeWidth="1.5" />
-      <path d="M16 12.5L27.5 18L16 23.5V12.5Z" fill="var(--color-accent)" />
-      <circle cx="29" cy="7" r="3.5" fill="var(--color-live)" />
-    </svg>
+    <div className="flex items-center gap-2" aria-label="Open Live">
+      <div className="w-3 h-3 bg-orange-500 shrink-0" />
+      <div className="flex flex-col" style={{ lineHeight: 1.1 }}>
+        <span className="text-[10px] font-bold tracking-[0.2em] text-orange-500">OPEN</span>
+        <span className="text-[10px] font-bold tracking-[0.2em] text-orange-500">LIVE</span>
+      </div>
+    </div>
   )
 }
 
 function IOIcon() {
   // Bidirectional arrows — left-pointing on top, right-pointing on bottom
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
       <path d="M4 8h16M4 8l3-3M4 8l3 3" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M20 16H4M20 16l-3-3M20 16l-3 3" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -29,7 +28,7 @@ function IOIcon() {
 function ProductionsIcon() {
   // Clapperboard
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
       <rect x="3" y="8" width="18" height="13" rx="1.5" stroke="var(--color-accent)" strokeWidth="1.5" />
       <path d="M3 12h18" stroke="var(--color-accent)" strokeWidth="1.5" />
       <path d="M7 8L5 12" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" />
@@ -49,8 +48,8 @@ export function NavBar() {
   const isLive = useProductionStore((s) => s.isLive)
 
   return (
-    <nav className="flex flex-col items-stretch w-16 bg-[--color-surface-2] border-r border-[--color-border] flex-shrink-0">
-      {/* Logo */}
+    <nav className="flex flex-col items-stretch bg-[--color-surface-2] border-r border-[--color-border] flex-shrink-0" style={{ width: 60 }}>
+      {/* Logo — h-11 matches PageHeader height so the border-b lines up */}
       <div className="h-14 flex items-center justify-center border-b border-[--color-border]">
         <OpenLiveLogo />
       </div>
@@ -64,7 +63,7 @@ export function NavBar() {
             title={label}
             className={({ isActive }) =>
               cn(
-                'flex flex-col items-center justify-center gap-1 py-3 rounded text-[10px] font-medium transition-all',
+                'flex items-center justify-center py-3 rounded transition-all',
                 isActive
                   ? 'bg-[--color-accent] text-[--color-text-dark]'
                   : 'text-[--color-text-muted] hover:text-[--color-text-primary] hover:bg-[rgba(89,203,232,0.1)]',
@@ -72,7 +71,6 @@ export function NavBar() {
             }
           >
             <Icon />
-            <span className="leading-none">{label}</span>
           </NavLink>
         ))}
       </div>

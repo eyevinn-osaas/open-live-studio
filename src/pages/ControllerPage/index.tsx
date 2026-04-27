@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router'
 import { useWebRTC } from '@/hooks/useWebRTC'
 import { useControllerWs } from '@/hooks/useControllerWs'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { Button } from '@/components/ui/Button'
 import { ProgramPreview, type ProgramPreviewHandle } from './ProgramPreview'
 import { TransitionPanel } from './TransitionPanel'
 import { DskPanel } from './DskPanel'
@@ -276,17 +275,20 @@ export function ControllerPage() {
   const showBottomRow = panels.controller || panels.audio
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex flex-col flex-1 min-h-0" style={{ background: '#000000' }}>
       <PageHeader
         title={
-          <div className="flex items-center gap-4">
-            <span>{activeProduction?.name ?? 'Studio'}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white">
+              {activeProduction?.name ?? 'Studio'}
+            </span>
+            {/* Panel toggle icons */}
             {PANEL_ICONS.map(({ key, Icon }) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => togglePanel(key)}
-                className={`cursor-pointer transition-colors ${panels[key] ? 'text-green-600' : 'text-red-600'}`}
+                className={`cursor-pointer transition-colors ${panels[key] ? 'text-orange-500' : 'text-zinc-600'}`}
               >
                 <Icon />
               </button>
@@ -294,17 +296,27 @@ export function ControllerPage() {
           </div>
         }
         actions={
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <TimerBar />
             <StreamingStatus />
-            <Button
-              variant={isLive ? 'pgm' : 'default'}
-              size="md"
+            {/* Go Live / ON AIR button — hardware style */}
+            <button
               onClick={handleGoLive}
               disabled={activeProduction?.status === 'activating'}
+              className={[
+                'btn-hardware px-5 py-1.5 text-[11px] font-bold uppercase tracking-widest border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                isLive
+                  ? 'text-white border-red-400 ring-1 ring-inset ring-white'
+                  : 'text-zinc-300 bg-zinc-900 border-zinc-600 hover:text-white hover:border-zinc-400',
+              ].join(' ')}
+              style={isLive ? { background: '#cc0000', borderColor: '#ff0000' } : {}}
             >
-              {activeProduction?.status === 'activating' ? '◌ Starting...' : isLive ? '● ON AIR' : '○ Go Live'}
-            </Button>
+              {activeProduction?.status === 'activating'
+                ? 'STARTING...'
+                : isLive
+                  ? '● ON AIR'
+                  : '○ GO LIVE'}
+            </button>
           </div>
         }
       />
@@ -354,9 +366,9 @@ export function ControllerPage() {
 
         {/* Controller + Audio row */}
         {showBottomRow && (
-          <div className={`flex pt-3 pb-4 ${panels.multiviewer ? 'flex-none' : 'flex-1 min-h-0 overflow-auto'}`}>
+          <div className={`flex pt-2 pb-3 gap-0 ${panels.multiviewer ? 'flex-none' : 'flex-1 min-h-0 overflow-auto'}`}>
             {panels.controller && (
-              <div className={`px-4 flex flex-col gap-3 ${panels.audio ? 'w-[70%]' : 'flex-1'}`}>
+              <div className={`px-3 flex flex-col gap-2 ${panels.audio ? 'w-[70%]' : 'flex-1'}`}>
                 <SectionLabel icon={<ControllerIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/controller?production=${activeProductionId}`, '_blank', 'noopener'); togglePanel('controller') } : undefined}>Controller</SectionLabel>
                 <TransitionPanel onCut={handleCut} onAuto={handleAuto} onFtb={handleFtb} onSelectPvw={handleSelectPvw} onSetOvl={handleSetOvl} />
                 <DskPanel onToggle={handleDskToggle} />
@@ -366,10 +378,8 @@ export function ControllerPage() {
               </div>
             )}
             {panels.audio && (
-              <div className={`flex flex-col gap-3 ${panels.controller ? 'w-[30%] pr-4' : 'flex-1 px-4'}`}>
-                <div className="ml-4">
-                  <SectionLabel icon={<AudioIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/audio?production=${activeProductionId}`, '_blank', 'noopener'); togglePanel('audio') } : undefined}>Audio</SectionLabel>
-                </div>
+              <div className={`flex flex-col gap-2 ${panels.controller ? 'w-[30%] pr-3' : 'flex-1 px-3'}`}>
+                <SectionLabel icon={<AudioIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/audio?production=${activeProductionId}`, '_blank', 'noopener'); togglePanel('audio') } : undefined}>Audio</SectionLabel>
                 <AudioPanel send={send} />
               </div>
             )}

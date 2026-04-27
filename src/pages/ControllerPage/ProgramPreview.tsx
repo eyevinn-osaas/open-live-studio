@@ -16,8 +16,10 @@ export const ProgramPreview = forwardRef<ProgramPreviewHandle>(function ProgramP
   }))
 
   return (
-    <div className="relative h-full aspect-video max-w-full">
-      <VideoTile ref={tileRef} stream={programStream} label="Multiview" tally="off" className="h-full w-full" />
+    <div className="relative h-full aspect-video max-w-full border border-zinc-800" style={{ background: '#000' }}>
+      <VideoTile ref={tileRef} stream={programStream} label="" tally="off" className="h-full w-full" />
+
+      {/* Connection state badge — bottom right */}
       <div className="absolute bottom-2 right-2 pointer-events-none">
         {connectionState === 'connected' && <Badge variant="live" label="LIVE" />}
         {connectionState === 'connecting' && <Badge variant="connecting" label="CONNECTING" />}

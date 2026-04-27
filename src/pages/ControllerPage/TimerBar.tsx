@@ -54,17 +54,27 @@ export function TimerBar() {
   }
 
   return (
-    <div className="flex items-center gap-4 text-xs font-mono text-[--color-text-muted]">
-      <span title="Wall clock">{now.toLocaleTimeString()}</span>
-      <span className="text-[--color-border]">|</span>
-      <span title="Elapsed since Go Live" className={isLive ? 'text-[--color-pgm]' : ''}>
-        {formatTime(elapsed)}
-      </span>
-      <span className="text-[--color-border]">|</span>
-      <span title="Segment timer">{formatTime(segment)}</span>
+    <div className="flex items-center gap-0 text-[10px] font-mono border border-zinc-800 bg-zinc-950">
+      {/* Wall clock */}
+      <div className="px-3 py-1.5 border-r border-zinc-800 text-zinc-400" title="Wall clock">
+        <span className="block text-[8px] uppercase tracking-widest text-zinc-600 mb-0.5">UTC</span>
+        <span>{now.toLocaleTimeString('en-GB', { hour12: false })}</span>
+      </div>
+      {/* Elapsed */}
+      <div className="px-3 py-1.5 border-r border-zinc-800" title="Elapsed since Go Live">
+        <span className="block text-[8px] uppercase tracking-widest text-zinc-600 mb-0.5">ELAPSED</span>
+        <span className={isLive ? 'text-red-500' : 'text-zinc-400'}>{formatTime(elapsed)}</span>
+      </div>
+      {/* Segment */}
+      <div className="px-3 py-1.5 border-r border-zinc-800" title="Segment timer">
+        <span className="block text-[8px] uppercase tracking-widest text-zinc-600 mb-0.5">SEG</span>
+        <span className="text-zinc-400">{formatTime(segment)}</span>
+      </div>
+      {/* Reset segment */}
       <button
         onClick={resetSegment}
-        className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-[--color-surface-raised] border border-[--color-border] hover:bg-[--color-surface-3] transition-colors"
+        className="btn-hardware px-2.5 py-1.5 text-[9px] uppercase tracking-widest text-zinc-500 hover:text-orange-500 hover:bg-zinc-900 transition-colors h-full"
+        title="Reset segment timer"
       >
         RST
       </button>
