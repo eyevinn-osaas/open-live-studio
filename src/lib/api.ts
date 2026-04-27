@@ -1,7 +1,7 @@
 // Runtime env injection: docker-entrypoint.sh writes /env-config.js which sets
 // window._env_.OPEN_LIVE_URL so the backend URL can be changed without rebuilding
 // the image (required for OSC parameter store injection).
-const BASE =
+export const BASE =
   (typeof window !== 'undefined' && (window as unknown as { _env_?: { OPEN_LIVE_URL?: string } })._env_?.OPEN_LIVE_URL) ||
   import.meta.env.OPEN_LIVE_URL ||
   'http://localhost:3000'
@@ -76,6 +76,7 @@ export interface ApiProduction {
   whipEndpoints?: Array<{ mixerInput: string; url: string }>
   srtOutputUri?: string
   values?: Record<string, string | number>
+  airTime?: string
 }
 
 export interface TemplateProperty {
@@ -128,6 +129,7 @@ type RawProduction = {
   whipEndpoints?: Array<{ mixerInput: string; url: string }>
   srtOutputUri?: string
   values?: Record<string, string | number>
+  airTime?: string
 }
 
 function normalizeProduction(d: RawProduction): ApiProduction {
@@ -145,6 +147,7 @@ function normalizeProduction(d: RawProduction): ApiProduction {
     whipEndpoints: d.whipEndpoints,
     srtOutputUri: d.srtOutputUri,
     values: d.values,
+    airTime: d.airTime,
   }
 }
 
@@ -163,7 +166,7 @@ export const productionsApi = {
       body: JSON.stringify(body),
     }).then(normalizeProduction),
 
-  update: (id: string, body: { name?: string; templateId?: string | null; values?: Record<string, string | number> }) =>
+  update: (id: string, body: { name?: string; templateId?: string | null; values?: Record<string, string | number>; airTime?: string | null }) =>
     request<RawProduction>(`/api/v1/productions/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),

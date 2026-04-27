@@ -12,7 +12,7 @@ interface PageHeaderProps {
 export function PageHeader({ title, subtitle, center, actions, className }: PageHeaderProps) {
   return (
     <div className={cn(
-      'flex items-center justify-between px-4 h-14 border-b border-zinc-800 flex-shrink-0 bg-black',
+      'flex items-center justify-between px-4 h-14 border-b border-white flex-shrink-0 bg-black',
       className,
     )}>
       <div className="flex items-center gap-3">

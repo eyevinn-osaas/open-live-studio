@@ -22,6 +22,7 @@ export interface Production {
   whipEndpoints?: Array<{ mixerInput: string; url: string }>
   srtOutputUri?: string
   values?: Record<string, string | number>
+  airTime?: string
 }
 
 interface ProductionsState {
@@ -37,6 +38,7 @@ interface ProductionsActions {
   updateStatus: (id: string, status: ProductionStatus) => Promise<void>
   updateTemplateId: (id: string, templateId: string | null) => Promise<void>
   updateValues: (id: string, values: Record<string, string | number>) => Promise<void>
+  updateAirTime: (id: string, airTime: string | null) => Promise<void>
   assignSource: (id: string, assignment: ProductionSourceAssignment) => Promise<void>
   unassignSource: (id: string, mixerInput: string) => Promise<void>
   assignGraphic: (id: string, assignment: ProductionGraphicAssignment) => Promise<void>
@@ -60,6 +62,7 @@ function fromApi(p: ApiProduction): Production {
     whipEndpoints: p.whipEndpoints,
     srtOutputUri: p.srtOutputUri,
     values: p.values,
+    airTime: p.airTime,
   }
 }
 
@@ -157,6 +160,14 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
         set((state) => {
           const prod = state.productions.find((p) => p.id === id)
           if (prod) prod.values = updated.values
+        })
+      },
+
+      updateAirTime: async (id, airTime) => {
+        await productionsApi.update(id, { airTime })
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (prod) prod.airTime = airTime ?? undefined
         })
       },
 

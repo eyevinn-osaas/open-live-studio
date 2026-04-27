@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router'
 import { cn } from '@/lib/cn'
-import { useProductionStore } from '@/store/production.store'
 import { ConnectionStatus } from '@/components/ui/ConnectionStatus'
 
 function OpenLiveLogo() {
@@ -45,8 +44,6 @@ const NAV_ITEMS = [
 ]
 
 export function NavBar() {
-  const isLive = useProductionStore((s) => s.isLive)
-
   return (
     <nav className="flex flex-col items-stretch bg-[--color-surface-2] border-r border-[--color-border] flex-shrink-0" style={{ width: 60 }}>
       {/* Logo — h-14 matches PageHeader height so the border-b lines up */}
@@ -75,13 +72,8 @@ export function NavBar() {
         ))}
       </div>
 
-      {/* Bottom: ON AIR when live, connection status always */}
-      <div className="p-1.5 pb-5 flex flex-col gap-2">
-        {isLive && (
-          <div className="w-full py-1.5 rounded text-[9px] font-mono font-bold text-center uppercase tracking-widest bg-[--color-live] text-white animate-pulse">
-            ON AIR
-          </div>
-        )}
+      {/* Bottom: connection status */}
+      <div className="p-1.5 pb-5">
         <ConnectionStatus />
       </div>
     </nav>

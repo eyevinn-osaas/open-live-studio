@@ -24,7 +24,7 @@ export function DskPanel({ onToggle }: DskPanelProps) {
   return (
     <div className="flex items-stretch border border-zinc-800 bg-zinc-950">
       {/* Section label */}
-      <div className="flex items-center px-2 border-r border-zinc-800">
+      <div className="flex items-center justify-center border-r border-zinc-800 shrink-0" style={{ width: 40 }}>
         <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-500">DSK</span>
       </div>
       <div className="flex gap-px flex-1 p-1">
@@ -41,7 +41,7 @@ export function DskPanel({ onToggle }: DskPanelProps) {
               key={a.dskInput}
               onClick={() => onToggle(layer, !active)}
               className={cn(
-                'btn-hardware flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors flex flex-col items-center gap-0',
+                'btn-hardware flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors flex flex-col items-center gap-0 cursor-pointer',
                 active
                   ? 'bg-orange-500 text-black border-orange-400'
                   : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-white hover:border-zinc-500',

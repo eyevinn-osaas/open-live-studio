@@ -260,12 +260,6 @@ function MasterStrip({ levelL, levelR, peakL, peakR }: {
         <span className="text-[10px] font-mono text-zinc-400">{faderDb(masterFader)}</span>
       </div>
 
-      {/* ON AIR */}
-      <div className="p-2">
-        <button className="w-full py-2 rounded bg-red-700 hover:bg-red-600 text-white text-[10px] font-mono font-bold tracking-widest transition-colors">
-          ON AIR
-        </button>
-      </div>
     </div>
   )
 }

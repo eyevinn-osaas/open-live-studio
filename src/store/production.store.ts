@@ -9,7 +9,6 @@ interface ProductionState {
   pgmInput: string | null
   /** Active mixer input on preview */
   pvwInput: string | null
-  isLive: boolean
   isFtb: boolean
   transitionType: TransitionType
   transitionDurationMs: number
@@ -28,7 +27,6 @@ interface ProductionActions {
   setTransitionType: (type: TransitionType) => void
   setTransitionDuration: (ms: number) => void
   setTBarPosition: (pos: number) => void
-  setLive: (live: boolean) => void
   setActiveProduction: (id: string | null) => void
   setDskState: (layer: number, visible: boolean) => void
 }
@@ -39,7 +37,6 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       // State
       pgmInput: null,
       pvwInput: null,
-      isLive: false,
       isFtb: false,
       transitionType: 'mix',
       transitionDurationMs: 1000,
@@ -92,11 +89,6 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       setTBarPosition: (pos) =>
         set((state) => {
           state.tBarPosition = Math.max(0, Math.min(1, pos))
-        }),
-
-      setLive: (live) =>
-        set((state) => {
-          state.isLive = live
         }),
 
       setActiveProduction: (id) =>

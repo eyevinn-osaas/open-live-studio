@@ -72,14 +72,13 @@ input[type="range"] {
   height: 3px;
   background: #2a2a2a;
   border-radius: 0;
-  border: 1px solid #333333;
 }
 .fader-rotated::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 44px;
-  margin-top: -21px;
+  width: 16px;
+  height: 17px;
+  margin-top: -7px;
   /* Brushed metal fader cap */
   background: linear-gradient(
     to right,
@@ -109,11 +108,10 @@ input[type="range"] {
   height: 3px;
   background: #2a2a2a;
   border-radius: 0;
-  border: 1px solid #333333;
 }
 .fader-rotated::-moz-range-thumb {
-  width: 20px;
-  height: 44px;
+  width: 16px;
+  height: 17px;
   background: linear-gradient(
     to right,
     #4a4a4a 0%,

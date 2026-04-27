@@ -105,12 +105,13 @@ function volumeToFader(vol: number): number {
 
 // ── Channel strip ─────────────────────────────────────────────────────────────
 
-function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }: {
+function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false, isPvw = false }: {
   elementId: string
   label: string
   send: SendFn
   showMute?: boolean
   isPgm?: boolean
+  isPvw?: boolean
 }) {
   const level = useAudioStore((s) => s.levels[elementId] ?? 1.0)
   const muted = useAudioStore((s) => s.muted[elementId] ?? false)
@@ -168,18 +169,18 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
     <div
       className={cn(
         'flex flex-col shrink-0 select-none border-r border-zinc-800',
-        isPgm ? 'ring-1 ring-inset ring-red-600' : '',
+        isPgm ? 'ring-1 ring-inset ring-red-600' : isPvw ? 'ring-1 ring-inset ring-green-600' : '',
       )}
       style={{ width: STRIP_W, background: '#0d0d0d' }}
     >
       {/* Channel label header */}
       <div
         className="px-1 py-0.5 text-center border-b border-zinc-800 shrink-0"
-        style={{ background: isPgm ? 'rgba(255,0,0,0.15)' : 'rgba(0,0,0,0.5)' }}
+        style={{ background: isPgm ? 'rgba(255,0,0,0.15)' : isPvw ? 'rgba(0,204,0,0.12)' : 'rgba(0,0,0,0.5)' }}
       >
         <span
           className="text-[9px] font-bold tracking-widest uppercase truncate block"
-          style={{ color: isPgm ? '#ff4040' : '#f97316' }}
+          style={{ color: isPgm ? '#ff4040' : isPvw ? '#00cc00' : '#f97316' }}
         >
           {label}
         </span>
@@ -230,8 +231,8 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
         <VuMeter elementId={elementId} />
 
         {/* Fader + tick marks */}
-        <div className="flex items-center justify-start">
-          <div className="relative overflow-visible" style={{ width: 28, height: FADER_H }}>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="relative overflow-hidden" style={{ width: 20, height: FADER_H }}>
             {/* Track line */}
             <div
               className="absolute pointer-events-none"
@@ -248,13 +249,13 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
             {/* Tick marks */}
             <div
               className="absolute flex flex-col justify-between pointer-events-none"
-              style={{ left: 16, top: 0, height: FADER_H, zIndex: 0 }}
+              style={{ left: 12, top: 0, height: FADER_H, zIndex: 0 }}
             >
               {Array.from({ length: TICK_COUNT }).map((_, i) => (
                 <div
                   key={i}
                   style={{
-                    width: i % 4 === 0 ? 7 : 4,
+                    width: i % 4 === 0 ? 6 : 3,
                     height: 1,
                     background: i % 4 === 0 ? '#3a3a3a' : '#252525',
                   }}
@@ -273,9 +274,9 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
               className="fader-rotated"
               style={{
                 width: FADER_H,
-                height: 28,
-                left: -(FADER_H - 28) / 2,
-                top: (FADER_H - 28) / 2,
+                height: 20,
+                left: -(FADER_H - 20) / 2,
+                top: (FADER_H - 20) / 2,
                 cursor: muted ? 'not-allowed' : 'pointer',
                 zIndex: 1,
               }}
@@ -309,15 +310,16 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
 export function AudioPanel({ send }: { send: SendFn }) {
   const elements = useAudioStore((s) => s.elements)
   const pgmInput = useProductionStore((s) => s.pgmInput)
+  const pvwInput = useProductionStore((s) => s.pvwInput)
 
   const mainElement = elements.find((e) => e.elementId === 'main')
-  const inputElements = elements.filter((e) => e.elementId !== 'main')
+  const inputElements = elements.filter((e) => e.elementId !== 'main' && e.mixerInput !== null)
 
   const hasContent = elements.length > 0
 
   return (
     <div
-      className="border border-zinc-800 overflow-hidden flex items-stretch w-fit"
+      className="border border-zinc-800 overflow-hidden flex items-stretch w-full"
       style={{ background: '#0d0d0d' }}
     >
       {!hasContent ? (
@@ -351,11 +353,11 @@ export function AudioPanel({ send }: { send: SendFn }) {
           {/* INPUTS section label */}
           <div
             className="flex items-center justify-center shrink-0 border-x border-zinc-800"
-            style={{ width: 16, background: 'rgba(0,204,0,0.06)' }}
+            style={{ width: 16, background: 'rgba(249,115,22,0.08)' }}
           >
             <span
               className="text-[8px] font-bold tracking-widest uppercase whitespace-nowrap"
-              style={{ writingMode: 'vertical-rl', color: '#00aa44' }}
+              style={{ writingMode: 'vertical-rl', color: '#f97316' }}
             >
               IN
             </span>
@@ -376,6 +378,7 @@ export function AudioPanel({ send }: { send: SendFn }) {
                     label={el.label}
                     send={send}
                     isPgm={!!pgmInput && el.mixerInput === pgmInput}
+                    isPvw={!!pvwInput && el.mixerInput === pvwInput}
                   />
                 ))
               )}

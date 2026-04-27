@@ -2,7 +2,7 @@ import { useProductionStore, type TransitionType } from '@/store/production.stor
 import { useProductionsStore } from '@/store/productions.store'
 import { useSourcesStore } from '@/store/sources.store'
 import { cn } from '@/lib/cn'
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useState, useEffect } from 'react'
 
 const DURATION_PRESETS_MS = [500, 1000, 2000]
 const TRANSITION_TYPES: TransitionType[] = ['mix', 'dip', 'push']
@@ -13,9 +13,10 @@ interface TransitionPanelProps {
   onFtb: () => void
   onSelectPvw: (mixerInput: string) => void
   onSetOvl: (alpha: number) => void
+  className?: string
 }
 
-export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }: TransitionPanelProps) {
+export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, className }: TransitionPanelProps) {
   const ovlTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const debouncedSetOvl = useCallback((alpha: number) => {
     if (ovlTimerRef.current) clearTimeout(ovlTimerRef.current)
@@ -28,6 +29,42 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
     setPgm, setTransitionType, setTransitionDuration, setTBarPosition,
     activeProductionId,
   } = useProductionStore()
+
+  // Custom input keeps its own value; presets don't overwrite it
+  const [customMs, setCustomMs] = useState(() =>
+    DURATION_PRESETS_MS.includes(transitionDurationMs) ? 1500 : transitionDurationMs
+  )
+  const isCustomActive = !DURATION_PRESETS_MS.includes(transitionDurationMs)
+  const [isEditingCustom, setIsEditingCustom] = useState(false)
+  // Raw string while editing so clearing the field doesn't snap to 0
+  const [editValue, setEditValue] = useState('')
+  const customInputRef = useRef<HTMLInputElement>(null)
+
+  // Exit edit mode whenever a preset is selected
+  useEffect(() => {
+    if (!isCustomActive) setIsEditingCustom(false)
+  }, [isCustomActive])
+
+  const handleCustomClick = () => {
+    if (!isCustomActive) {
+      // First click: select
+      setTransitionDuration(customMs)
+    } else if (!isEditingCustom) {
+      // Second click: enter edit mode — seed string from current value
+      setEditValue(String(customMs))
+      setIsEditingCustom(true)
+      setTimeout(() => { customInputRef.current?.select() }, 0)
+    }
+  }
+
+  const commitEdit = () => {
+    const parsed = parseInt(editValue, 10)
+    if (!isNaN(parsed) && parsed >= 100 && parsed <= 10000) {
+      setCustomMs(parsed)
+      setTransitionDuration(parsed)
+    }
+    setIsEditingCustom(false)
+  }
 
   const production = useProductionsStore((s) => s.productions.find((p) => p.id === activeProductionId))
   const sources = useSourcesStore((s) => s.sources)
@@ -47,10 +84,10 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
     })
 
   return (
-    <div className="border border-zinc-800 bg-zinc-950 overflow-hidden">
+    <div className={cn("flex flex-col border border-zinc-800 bg-zinc-950 overflow-hidden", className)}>
 
       {/* ── PGM row ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
+      <div className="flex flex-1 items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
         {/* Row label */}
         <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800"
           style={{ width: 40, background: 'rgba(255,0,0,0.12)' }}>
@@ -58,9 +95,9 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
         </div>
 
         {/* Source tiles */}
-        <div className="flex items-center gap-px flex-1 overflow-x-auto px-1.5 py-1">
+        <div className="flex items-stretch gap-px flex-1 overflow-x-auto p-1">
           {inputSlots.length === 0 && (
-            <span className="text-[9px] text-zinc-600 italic px-1">
+            <span className="text-[9px] text-zinc-600 italic px-1 flex items-center">
               {!production?.templateId ? 'NO TEMPLATE' : 'NO SOURCES'}
             </span>
           )}
@@ -68,7 +105,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
             <div
               key={slot.mixerInput}
               className={cn(
-                'flex-1 min-w-14 py-1 px-1.5 text-[10px] font-bold truncate border cursor-default select-none flex items-center justify-center tracking-wide',
+                'flex-1 min-w-14 px-1.5 text-[10px] font-bold truncate border cursor-default select-none flex items-center justify-center tracking-wide',
                 pgmInput === slot.mixerInput
                   ? 'text-white border-white'
                   : 'text-zinc-600 border-zinc-800 bg-zinc-900',
@@ -81,25 +118,25 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
         </div>
 
         {/* Action group: TAKE + AUTO + FTB */}
-        <div className="flex items-center gap-px px-1.5 shrink-0 border-l border-zinc-800 py-1">
+        <div className="flex items-stretch gap-px p-1 shrink-0 border-l border-zinc-800" style={{ width: 224 }}>
           {/* TAKE — large physical button */}
           <button
             onClick={onCut}
-            className="btn-hardware px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white border ring-1 ring-inset ring-white transition-opacity hover:opacity-90"
-            style={{ background: '#cc0000', borderColor: '#ff0000', minWidth: 64 }}
+            className="btn-hardware flex-1 text-[11px] font-bold uppercase tracking-widest text-white border ring-1 ring-inset ring-white transition-opacity hover:opacity-90 cursor-pointer"
+            style={{ background: '#cc0000', borderColor: '#ff0000' }}
           >
             TAKE
           </button>
           <button
             onClick={onAuto}
-            className="btn-hardware px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-300 bg-zinc-800 border border-zinc-600 hover:bg-zinc-700 transition-colors"
+            className="btn-hardware flex-1 text-[10px] font-bold uppercase tracking-widest text-zinc-300 bg-zinc-800 border border-zinc-600 hover:bg-zinc-700 transition-colors cursor-pointer"
           >
             AUTO
           </button>
           <button
             onClick={onFtb}
             className={cn(
-              'btn-hardware px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors',
+              'btn-hardware flex-1 text-[10px] font-bold uppercase tracking-widest border transition-colors cursor-pointer',
               isFtb
                 ? 'text-white border-zinc-400 bg-zinc-700'
                 : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-300',
@@ -111,7 +148,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
       </div>
 
       {/* ── PVW row ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
+      <div className="flex flex-1 items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
         {/* Row label */}
         <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800"
           style={{ width: 40, background: 'rgba(0,204,0,0.10)' }}>
@@ -119,9 +156,9 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
         </div>
 
         {/* Source tiles */}
-        <div className="flex items-center gap-px flex-1 overflow-x-auto px-1.5 py-1">
+        <div className="flex items-stretch gap-px flex-1 overflow-x-auto p-1">
           {inputSlots.length === 0 && (
-            <span className="text-[9px] text-zinc-600 italic px-1">
+            <span className="text-[9px] text-zinc-600 italic px-1 flex items-center">
               {!production?.templateId ? 'NO TEMPLATE' : 'NO SOURCES'}
             </span>
           )}
@@ -134,7 +171,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
                 onClick={() => !isOnPgm && onSelectPvw(slot.mixerInput)}
                 disabled={isOnPgm}
                 className={cn(
-                  'btn-hardware flex-1 min-w-14 py-1 px-1.5 text-[10px] font-bold truncate border transition-all tracking-wide',
+                  'btn-hardware flex-1 min-w-14 px-1.5 text-[10px] font-bold truncate border transition-all tracking-wide cursor-pointer',
                   isActive
                     ? 'text-black border-white'
                     : isOnPgm
@@ -149,20 +186,18 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
           })}
         </div>
 
-        {/* Transition type selector — 3-button hardware bus strip */}
-        <div className="flex items-center shrink-0 border-l border-zinc-800 px-1.5 py-1 gap-0">
-          {TRANSITION_TYPES.map((type, idx) => (
+        {/* Transition type selector */}
+        <div className="flex items-stretch shrink-0 border-l border-zinc-800 p-1 gap-px" style={{ width: 224 }}>
+          {TRANSITION_TYPES.map((type) => (
             <button
               key={type}
               onClick={() => setTransitionType(type)}
               className={cn(
-                'btn-hardware px-0 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors',
-                idx === 0 ? 'border-r-0' : idx === TRANSITION_TYPES.length - 1 ? 'border-l-0' : 'border-x-0',
+                'btn-hardware flex-1 text-[10px] font-bold uppercase tracking-widest border transition-colors cursor-pointer',
                 transitionType === type
-                  ? 'text-black bg-orange-500 border-orange-400 z-10 relative'
+                  ? 'text-black bg-orange-500 border-orange-400'
                   : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-300 hover:bg-zinc-800',
               )}
-              style={{ minWidth: 52 }}
             >
               {type.toUpperCase()}
             </button>
@@ -171,7 +206,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
       </div>
 
       {/* ── OVL / T-bar row ─────────────────────────────────────────────────── */}
-      <div className="flex items-stretch">
+      <div className="flex flex-1 items-stretch">
         {/* Row label */}
         <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800" style={{ width: 40 }}>
           <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-600">OVL</span>
@@ -219,32 +254,54 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
         </div>
 
         {/* Duration presets + custom ms input */}
-        <div className="flex items-center gap-px px-1.5 py-1 shrink-0 border-l border-zinc-800">
+        <div className="flex items-stretch gap-px p-1 shrink-0 border-l border-zinc-800" style={{ width: 224 }}>
           {DURATION_PRESETS_MS.map((ms) => (
             <button
               key={ms}
               onClick={() => setTransitionDuration(ms)}
               className={cn(
-                'btn-hardware px-2.5 py-1.5 text-[9px] font-mono border transition-colors uppercase tracking-widest',
+                'btn-hardware flex items-center justify-center gap-px border transition-colors shrink-0 cursor-pointer',
                 transitionDurationMs === ms
                   ? 'text-black bg-orange-500 border-orange-400'
                   : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-300',
               )}
+              style={{ width: 44 }}
             >
-              {ms / 1000}S
+              <span className="text-[11px] font-mono font-bold leading-none">{ms / 1000}</span>
+              <span className="text-[8px] font-mono leading-none mt-px">S</span>
             </button>
           ))}
-          <input
-            type="number"
-            min={100}
-            max={10000}
-            step={100}
-            value={transitionDurationMs}
-            onChange={(e) => setTransitionDuration(Number(e.target.value))}
-            className="w-[64px] px-2 py-1.5 border border-zinc-700 bg-zinc-900 text-[10px] font-mono text-zinc-300 text-right focus:outline-none focus:border-orange-500"
-            style={{ appearance: 'textfield' }}
-          />
-          <span className="text-[9px] text-zinc-600 px-1 uppercase">MS</span>
+          {/* Custom ms input — single click selects, second click edits */}
+          <div
+            onClick={handleCustomClick}
+            className={cn(
+              'flex items-center justify-center flex-1 border gap-0.5 px-1 transition-colors',
+              isEditingCustom
+                ? 'bg-zinc-800 border-white'
+                : isCustomActive
+                  ? 'bg-orange-500 border-orange-500'
+                  : 'bg-zinc-900 border-zinc-700 hover:border-zinc-500 cursor-pointer',
+            )}
+          >
+            <input
+              ref={customInputRef}
+              type="text"
+              inputMode="numeric"
+              value={isEditingCustom ? editValue : String(customMs)}
+              readOnly={!isEditingCustom}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => { if (e.key === 'Enter') customInputRef.current?.blur() }}
+              className={cn(
+                'w-10 bg-transparent text-[11px] font-mono font-bold text-right focus:outline-none',
+                isEditingCustom ? 'text-white cursor-text' : isCustomActive ? 'text-black cursor-pointer' : 'text-zinc-300 cursor-pointer',
+              )}
+            />
+            <span className={cn(
+              'text-[8px] font-mono uppercase shrink-0 mt-px pointer-events-none',
+              isEditingCustom ? 'text-zinc-400' : isCustomActive ? 'text-black/70' : 'text-zinc-600',
+            )}>MS</span>
+          </div>
         </div>
       </div>
 

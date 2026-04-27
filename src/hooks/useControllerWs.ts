@@ -32,7 +32,6 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
   const wsRef = useRef<WebSocket | null>(null)
   const setPgm = useProductionStore((s) => s.setPgm)
   const setPvw = useProductionStore((s) => s.setPvw)
-  const setLive = useProductionStore((s) => s.setLive)
   const setTBarPosition = useProductionStore((s) => s.setTBarPosition)
   const setDskState = useProductionStore((s) => s.setDskState)
   const applyLevel = useAudioStore((s) => s.applyLevel)
@@ -61,9 +60,6 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
             if (typeof msg['alpha'] === 'number') {
               setTBarPosition(msg['alpha'] as number)
             }
-            break
-          case 'ON_AIR':
-            setLive(!!msg['value'])
             break
           case 'DSK_STATE':
             if (typeof msg['layer'] === 'number' && typeof msg['visible'] === 'boolean') {
@@ -98,7 +94,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
       ws.close()
       wsRef.current = null
     }
-  }, [productionId, setPgm, setPvw, setLive, setTBarPosition, setDskState, applyLevel, applyMuted, applyMeter])
+  }, [productionId, setPgm, setPvw, setTBarPosition, setDskState, applyLevel, applyMuted, applyMeter])
 
   const send = useCallback((msg: OutboundMessage) => {
     const ws = wsRef.current

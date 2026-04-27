@@ -69,6 +69,7 @@ export function GraphicsPanel() {
                   ? 'border-[--color-border] hover:border-zinc-600 cursor-not-allowed'
                   : 'border-[--color-border] hover:border-orange-500 cursor-pointer'
               }`}
+              onClick={() => !inActiveProduction && setEditTarget({ id: g.id, name: g.name, url: g.url })}
             >
               <StatusDot color={inActiveProduction ? 'red' : 'gray'} />
               <div className="flex-1 min-w-0">
@@ -83,7 +84,7 @@ export function GraphicsPanel() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => !inActiveProduction && setEditTarget({ id: g.id, name: g.name, url: g.url })}
+                onClick={(e) => { e.stopPropagation(); !inActiveProduction && setEditTarget({ id: g.id, name: g.name, url: g.url }) }}
                 disabled={inActiveProduction}
                 className="text-white hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed"
                 title={inActiveProduction ? 'Cannot edit graphic in an active production' : 'Edit graphic'}
@@ -93,7 +94,7 @@ export function GraphicsPanel() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setDeleteTargetId(g.id)}
+                onClick={(e) => { e.stopPropagation(); setDeleteTargetId(g.id) }}
                 disabled={inActiveProduction}
                 className="text-white hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
                 title={inActiveProduction ? 'Graphic is in an active production' : 'Delete graphic'}
@@ -143,7 +144,7 @@ export function GraphicsPanel() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Lower Third"
-              className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+              className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
             />
           </div>
           <div>
@@ -153,7 +154,7 @@ export function GraphicsPanel() {
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               placeholder="https://example.com/overlay"
-              className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+              className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
             />
           </div>
           <div className="flex justify-end gap-2 pt-1">
@@ -179,7 +180,7 @@ export function GraphicsPanel() {
                 type="text"
                 value={editTarget.name}
                 onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })}
-                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
               />
             </div>
             <div>
@@ -188,7 +189,7 @@ export function GraphicsPanel() {
                 type="url"
                 value={editTarget.url}
                 onChange={(e) => setEditTarget({ ...editTarget, url: e.target.value })}
-                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
               />
             </div>
             <div className="flex justify-end gap-2 pt-1">

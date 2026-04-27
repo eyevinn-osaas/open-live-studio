@@ -7,10 +7,10 @@ import { Modal } from '@/components/ui/Modal'
 
 // Re-used from ProductionsPanel — inline here to keep the panel self-contained
 const selectCls =
-  'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent] appearance-none cursor-pointer'
+  'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 appearance-none cursor-pointer'
 
 const inputCls =
-  'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]'
+  'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30'
 
 // ---------------------------------------------------------------------------
 // Edit modal
@@ -187,6 +187,7 @@ export function ConfigsPanel() {
               <div
                 key={cfg._id}
                 className="flex items-center gap-3 px-4 py-3 rounded bg-[--color-surface-3] border border-[--color-border] hover:border-orange-500 transition-colors cursor-pointer"
+                onClick={() => setEditTarget(cfg)}
               >
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-[--color-text-primary] truncate block">{cfg.name}</span>
@@ -203,11 +204,11 @@ export function ConfigsPanel() {
                   </span>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <Button size="sm" variant="ghost" onClick={() => setEditTarget(cfg)}>Edit</Button>
+                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditTarget(cfg) }}>Edit</Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => setDeleteTarget(cfg)}
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(cfg) }}
                     className="text-white hover:text-red-400"
                   >
                     Delete

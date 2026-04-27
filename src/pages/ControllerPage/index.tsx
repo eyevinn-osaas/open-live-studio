@@ -9,8 +9,8 @@ import { DskPanel } from './DskPanel'
 import { MacroBar } from './MacroBar'
 import { AudioPanel } from './AudioPanel'
 import { TimerBar } from './TimerBar'
-import { StreamingStatus } from './StreamingStatus'
 import { useProductionStore } from '@/store/production.store'
+import { useIsOnAir } from '@/store/programClock.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { useStatsStore } from '@/store/stats.store'
 import { useAudioStore } from '@/store/audio.store'
@@ -150,12 +150,14 @@ function AudioIcon() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function ControllerPage() {
-  const { isLive, setLive, cut, auto, ftb, setPvw, pvwInput, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
+  const { cut, auto, ftb, setPvw, pvwInput, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
   const activeProduction = useProductionsStore((s) => s.productions.find((p) => p.id === activeProductionId))
   const whepEndpoint = useProductionsStore(
     (s) => s.productions.find((p) => p.id === activeProductionId)?.whepEndpoint,
   )
+  const isOnAir = useIsOnAir()
+
   const [searchParams] = useSearchParams()
   const [panels, setPanels] = useState<Panels>(loadPanels)
   const [multiviewerMuted, setMultiviewerMuted] = useState(true)
@@ -252,12 +254,6 @@ export function ControllerPage() {
     }
   }, [])
 
-  const handleGoLive = () => {
-    const next = !isLive
-    setLive(next)
-    send(next ? { type: 'GO_LIVE' } : { type: 'CUT_STREAM' })
-  }
-
   const handleDskToggle = (layer: number, visible: boolean) => {
     send({ type: 'DSK_TOGGLE', layer, visible })
   }
@@ -296,27 +292,23 @@ export function ControllerPage() {
           </div>
         }
         actions={
-          <div className="flex items-center gap-2">
+          /* Timer bar + LIVE button — flush together, same height */
+          <div className="flex items-stretch">
             <TimerBar />
-            <StreamingStatus />
-            {/* Go Live / ON AIR button — hardware style */}
-            <button
-              onClick={handleGoLive}
-              disabled={activeProduction?.status === 'activating'}
+            <div
               className={[
-                'btn-hardware px-5 py-1.5 text-[11px] font-bold uppercase tracking-widest border transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-                isLive
-                  ? 'text-white border-red-400 ring-1 ring-inset ring-white'
-                  : 'text-zinc-300 bg-zinc-900 border-zinc-600 hover:text-white hover:border-zinc-400',
+                'px-4 flex items-center text-[11px] font-bold uppercase tracking-widest border select-none',
+                isOnAir
+                  ? 'text-white border-red-600'
+                  : 'text-zinc-500 bg-zinc-950 border-l-0 border-zinc-800',
               ].join(' ')}
-              style={isLive ? { background: '#cc0000', borderColor: '#ff0000' } : {}}
+              style={isOnAir ? { background: 'rgba(160,0,0,0.20)', borderColor: '#cc0000' } : {}}
             >
-              {activeProduction?.status === 'activating'
-                ? 'STARTING...'
-                : isLive
-                  ? '● ON AIR'
-                  : '○ GO LIVE'}
-            </button>
+              <span className="flex items-center gap-1.5">
+                <span style={isOnAir ? { color: '#ff2222' } : {}}>●</span>
+                LIVE
+              </span>
+            </div>
           </div>
         }
       />
@@ -366,15 +358,17 @@ export function ControllerPage() {
 
         {/* Controller + Audio row */}
         {showBottomRow && (
-          <div className={`flex pt-2 pb-3 gap-0 ${panels.multiviewer ? 'flex-none' : 'flex-1 min-h-0 overflow-auto'}`}>
+          <div className="flex flex-none pt-2 pb-3 gap-0">
             {panels.controller && (
-              <div className={`px-3 flex flex-col gap-2 ${panels.audio ? 'w-[70%]' : 'flex-1'}`}>
+              <div className={`px-3 flex flex-col gap-2 self-stretch ${panels.audio ? 'w-[70%]' : 'flex-1'}`}>
                 <SectionLabel icon={<ControllerIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/controller?production=${activeProductionId}`, '_blank', 'noopener'); togglePanel('controller') } : undefined}>Controller</SectionLabel>
-                <TransitionPanel onCut={handleCut} onAuto={handleAuto} onFtb={handleFtb} onSelectPvw={handleSelectPvw} onSetOvl={handleSetOvl} />
-                <DskPanel onToggle={handleDskToggle} />
-                {false && activeProductionId && (
-                  <MacroBar productionId={activeProductionId!} onExec={handleMacroExec} />
-                )}
+                <div className="flex flex-col flex-1 gap-2">
+                  <TransitionPanel onCut={handleCut} onAuto={handleAuto} onFtb={handleFtb} onSelectPvw={handleSelectPvw} onSetOvl={handleSetOvl} className="flex-1" />
+                  <DskPanel onToggle={handleDskToggle} />
+                  {false && activeProductionId && (
+                    <MacroBar productionId={activeProductionId!} onExec={handleMacroExec} />
+                  )}
+                </div>
               </div>
             )}
             {panels.audio && (
