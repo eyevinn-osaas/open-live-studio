@@ -3,20 +3,27 @@ import { Shell } from '@/components/layout/Shell'
 import { SetupPage } from '@/pages/SetupPage'
 import { ControllerPage } from '@/pages/ControllerPage'
 import { TallyPage } from '@/pages/TallyPage'
+import { ProductionsPage } from '@/pages/ProductionsPage'
+import { PanePage } from '@/pages/PanePage'
 
 export const router = createBrowserRouter([
   {
-    // Tally page is standalone — no Shell wrapper, no auth required
+    // Standalone pages — no Shell, no nav
     path: '/tally',
     element: <TallyPage />,
+  },
+  {
+    path: '/pane/:pane',
+    element: <PanePage />,
   },
   {
     path: '/',
     element: <Shell />,
     children: [
-      { index: true, element: <Navigate to="/setup" replace /> },
+      { index: true, element: <Navigate to="/productions" replace /> },
+      { path: 'productions', element: <ProductionsPage /> },
       { path: 'setup/*', element: <SetupPage /> },
-      { path: 'controller', element: <ControllerPage /> },
+      { path: 'studio', element: <ControllerPage /> },
     ],
   },
 ])

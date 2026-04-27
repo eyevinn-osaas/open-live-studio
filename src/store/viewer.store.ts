@@ -8,11 +8,13 @@ interface ViewerState {
   connectionState: ViewerConnectionState
   isMockStream: boolean
   isMuted: boolean
+  retryCountdown: number | null
 }
 
 interface ViewerActions {
   setProgramStream: (stream: MediaStream | null, isMock: boolean) => void
   setConnectionState: (state: ViewerConnectionState) => void
+  setRetryCountdown: (n: number | null) => void
   setMuted: (muted: boolean) => void
   disconnect: () => void
 }
@@ -24,6 +26,7 @@ export const useViewerStore = create<ViewerState & ViewerActions>()(
       connectionState: 'disconnected',
       isMockStream: false,
       isMuted: true,
+      retryCountdown: null,
 
       setProgramStream: (stream, isMock) =>
         set({
@@ -33,6 +36,8 @@ export const useViewerStore = create<ViewerState & ViewerActions>()(
         }),
 
       setConnectionState: (connectionState) => set({ connectionState }),
+
+      setRetryCountdown: (retryCountdown) => set({ retryCountdown }),
 
       setMuted: (muted) => set({ isMuted: muted }),
 

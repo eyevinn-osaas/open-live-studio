@@ -1,6 +1,5 @@
 import { useShallow } from 'zustand/react/shallow'
 import { useSourcesStore } from '@/store/sources.store'
-import { useProductionStore } from '@/store/production.store'
 import { useTallyLight } from '@/hooks/useTallyLight'
 import { cn } from '@/lib/cn'
 
@@ -44,22 +43,9 @@ function TallyBlock({ sourceId }: { sourceId: string }) {
 
 export function TallyPage() {
   const sources = useSourcesStore(useShallow((s) => s.sources))
-  const isLive = useProductionStore((s) => s.isLive)
 
   return (
     <div className="min-h-screen bg-black p-4 flex flex-col gap-4">
-      {/* ON AIR indicator */}
-      <div className="flex justify-center">
-        <div
-          className={cn(
-            'px-8 py-2 rounded-full text-sm font-black uppercase tracking-[0.3em]',
-            isLive ? 'bg-red-600 text-white animate-pulse' : 'bg-zinc-900 text-zinc-700',
-          )}
-        >
-          {isLive ? '● ON AIR' : '○ OFF AIR'}
-        </div>
-      </div>
-
       {/* Tally grid */}
       {sources.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">

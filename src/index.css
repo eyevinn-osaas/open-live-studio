@@ -1,33 +1,33 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  /* Broadcast tally */
-  --color-pgm: #dc2626;
-  --color-pvw: #16a34a;
-  --color-tally-off: #3d3d3d;
-  --color-live: #ef4444;
+  /* Broadcast tally — hard hardware colors */
+  --color-pgm: #ff0000;
+  --color-pvw: #00cc00;
+  --color-tally-off: #2a2a2a;
+  --color-live: #ff0000;
 
-  /* Brand — matches intercom cyan */
-  --color-accent: #59cbe8;
-  --color-accent-hover: rgba(89, 203, 232, 0.85);
+  /* Brand — orange, like hardware broadcast gear */
+  --color-accent: #f97316;
+  --color-accent-hover: #ea6c0a;
 
-  /* Surfaces — intercom palette */
-  --color-surface-1: #1e1e1e;
-  --color-surface-2: #242424;
-  --color-surface-3: rgba(50, 56, 59, 0.4);
-  --color-surface-raised: #32383b;
+  /* Surfaces — true black foundation */
+  --color-surface-1: #111111;
+  --color-surface-2: #161616;
+  --color-surface-3: #1a1a1a;
+  --color-surface-raised: #222222;
 
   /* Borders */
-  --color-border: rgba(109, 109, 109, 0.3);
-  --color-border-strong: #6d6d6d;
+  --color-border: #2a2a2a;
+  --color-border-strong: #444444;
 
   /* Text */
-  --color-text-primary: rgba(255, 255, 255, 0.87);
-  --color-text-muted: rgba(255, 255, 255, 0.5);
-  --color-text-dark: #1a1a1a;
+  --color-text-primary: rgba(255, 255, 255, 0.92);
+  --color-text-muted: rgba(255, 255, 255, 0.45);
+  --color-text-dark: #000000;
 
-  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 }
 
 * {
@@ -40,24 +40,137 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: var(--color-surface-1);
+  background-color: #000000;
   color: var(--color-text-primary);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: 'IBM Plex Mono', ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
   -webkit-font-smoothing: antialiased;
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
 }
 
 /* Tally ring utilities */
-.ring-pgm { --tw-ring-color: var(--color-pgm); }
-.ring-pvw  { --tw-ring-color: var(--color-pvw); }
+.ring-pgm { --tw-ring-color: #ff0000; }
+.ring-pvw  { --tw-ring-color: #00cc00; }
 
 /* Range inputs */
 input[type="range"] {
-  accent-color: var(--color-accent);
+  accent-color: #f97316;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--color-surface-2); }
-::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 3px; }
+/* Vertical channel fader — horizontal input rotated -90deg */
+.fader-rotated {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  outline: none;
+  position: absolute;
+  transform: rotate(-90deg);
+  transform-origin: center center;
+}
+.fader-rotated::-webkit-slider-runnable-track {
+  height: 3px;
+  background: #2a2a2a;
+  border-radius: 0;
+}
+.fader-rotated::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 17px;
+  margin-top: -7px;
+  /* Brushed metal fader cap */
+  background: linear-gradient(
+    to right,
+    #4a4a4a 0%,
+    #7a7a7a 15%,
+    #a0a0a0 30%,
+    #c8c8c8 45%,
+    #dedede 50%,
+    #c8c8c8 55%,
+    #a0a0a0 70%,
+    #7a7a7a 85%,
+    #4a4a4a 100%
+  );
+  border: 1px solid #888888;
+  border-radius: 1px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.3);
+  cursor: pointer;
+  /* Center line on fader cap */
+  outline: none;
+}
+.fader-rotated:disabled::-webkit-slider-thumb {
+  background: #2a2a2a;
+  border-color: #333333;
+  cursor: not-allowed;
+}
+.fader-rotated::-moz-range-track {
+  height: 3px;
+  background: #2a2a2a;
+  border-radius: 0;
+}
+.fader-rotated::-moz-range-thumb {
+  width: 16px;
+  height: 17px;
+  background: linear-gradient(
+    to right,
+    #4a4a4a 0%,
+    #7a7a7a 15%,
+    #a0a0a0 30%,
+    #c8c8c8 45%,
+    #dedede 50%,
+    #c8c8c8 55%,
+    #a0a0a0 70%,
+    #7a7a7a 85%,
+    #4a4a4a 100%
+  );
+  border: 1px solid #888888;
+  border-radius: 1px;
+  cursor: pointer;
+}
+
+/* Scrollbar — minimal, dark */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #111111; }
+::-webkit-scrollbar-thumb { background: #333333; border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: #444444; }
+
+/* VU meter segmented look — PPM style */
+.vu-segment-bar {
+  background: repeating-linear-gradient(
+    to top,
+    transparent 0px,
+    transparent 3px,
+    rgba(0,0,0,0.4) 3px,
+    rgba(0,0,0,0.4) 4px
+  );
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Hardware button press effect */
+.btn-hardware:active {
+  transform: translateY(1px);
+  box-shadow: none !important;
+}
+
+/* Production select styling */
+select.broadcast-select {
+  background-color: #111111;
+  border: 1px solid #333333;
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 24px 4px 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+select.broadcast-select:focus {
+  border-color: #f97316;
+}

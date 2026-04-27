@@ -9,12 +9,13 @@ interface ProductionState {
   pgmInput: string | null
   /** Active mixer input on preview */
   pvwInput: string | null
-  isLive: boolean
   isFtb: boolean
   transitionType: TransitionType
   transitionDurationMs: number
   tBarPosition: number // 0.0–1.0
   activeProductionId: string | null
+  /** Server-confirmed DSK layer visibility: layer index → visible */
+  dskState: Record<number, boolean>
 }
 
 interface ProductionActions {
@@ -26,8 +27,8 @@ interface ProductionActions {
   setTransitionType: (type: TransitionType) => void
   setTransitionDuration: (ms: number) => void
   setTBarPosition: (pos: number) => void
-  setLive: (live: boolean) => void
   setActiveProduction: (id: string | null) => void
+  setDskState: (layer: number, visible: boolean) => void
 }
 
 export const useProductionStore = create<ProductionState & ProductionActions>()(
@@ -36,12 +37,12 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       // State
       pgmInput: null,
       pvwInput: null,
-      isLive: false,
       isFtb: false,
       transitionType: 'mix',
       transitionDurationMs: 1000,
       tBarPosition: 1,
       activeProductionId: null,
+      dskState: {},
 
       // Actions
       cut: () =>
@@ -90,14 +91,15 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
           state.tBarPosition = Math.max(0, Math.min(1, pos))
         }),
 
-      setLive: (live) =>
-        set((state) => {
-          state.isLive = live
-        }),
-
       setActiveProduction: (id) =>
         set((state) => {
           state.activeProductionId = id
+          state.dskState = {}
+        }),
+
+      setDskState: (layer, visible) =>
+        set((state) => {
+          state.dskState[layer] = visible
         }),
     })),
     { name: 'production' },

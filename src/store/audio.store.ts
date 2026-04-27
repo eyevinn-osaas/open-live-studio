@@ -1,68 +1,63 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
-import { audioApi, type ApiAudioElement } from '@/lib/api'
+import type { ApiAudioElement } from '@/lib/api'
 
-// Throttle: max one PATCH per elementId per 100ms
-const pendingThrottle = new Map<string, ReturnType<typeof setTimeout>>()
-
-function throttledUpdate(productionId: string, elementId: string, property: string, value: unknown) {
-  if (pendingThrottle.has(elementId)) return
-  const timer = setTimeout(() => {
-    pendingThrottle.delete(elementId)
-    void audioApi.updateElement(productionId, elementId, { property, value })
-  }, 100)
-  pendingThrottle.set(elementId, timer)
-}
+interface MeterReading { peak: number[]; rms: number[]; decay?: number[] }
 
 interface AudioState {
   elements: ApiAudioElement[]
-  levels: Record<string, number>      // elementId → 0.0–1.0
-  muted: Record<string, boolean>      // elementId → boolean
+  levels: Record<string, number>        // elementId → 0.0–1.0
+  muted: Record<string, boolean>        // elementId → boolean
+  meters: Record<string, MeterReading>  // elementId → peak/rms in dB
   productionId: string | null
 }
 
 interface AudioActions {
   setElements: (elements: ApiAudioElement[], productionId: string) => void
+  // Pure setters called by the WS handler when the server broadcasts state
+  applyLevel: (elementId: string, value: number) => void
+  applyMuted: (elementId: string, muted: boolean) => void
+  applyMeter: (elementId: string, peak: number[], rms: number[]) => void
+  // Optimistic local-only updates called by the UI before sending via WS
   setLevel: (elementId: string, value: number) => void
   toggleMute: (elementId: string) => void
 }
 
 export const useAudioStore = create<AudioState & AudioActions>()(
   devtools(
-    immer((set, get) => ({
+    immer((_set, get) => ({
       elements: [],
       levels: {},
       muted: {},
+      meters: {},
       productionId: null,
 
       setElements: (elements, productionId) =>
-        set((s) => {
+        _set((s) => {
           s.elements = elements
           s.productionId = productionId
-          // Initialise levels to 1.0 and muted to false for new elements
           elements.forEach((el) => {
             if (s.levels[el.elementId] === undefined) s.levels[el.elementId] = 1.0
             if (s.muted[el.elementId] === undefined) s.muted[el.elementId] = false
           })
         }),
 
-      setLevel: (elementId, value) => {
-        const clamped = Math.max(0, Math.min(1, value))
-        set((s) => { s.levels[elementId] = clamped })
-        const { productionId } = get()
-        if (productionId) throttledUpdate(productionId, elementId, 'volume', clamped)
-      },
+      applyLevel: (elementId, value) =>
+        _set((s) => { s.levels[elementId] = Math.max(0, Math.min(1, value)) }),
+
+      applyMuted: (elementId, muted) =>
+        _set((s) => { s.muted[elementId] = muted }),
+
+      applyMeter: (elementId, peak, rms) =>
+        _set((s) => { s.meters[elementId] = { peak, rms } }),
+
+      setLevel: (elementId, value) =>
+        _set((s) => { s.levels[elementId] = Math.max(0, Math.min(1, value)) }),
 
       toggleMute: (elementId) => {
-        set((s) => { s.muted[elementId] = !s.muted[elementId] })
-        const { muted, productionId } = get()
-        if (productionId) {
-          void audioApi.updateElement(productionId, elementId, {
-            property: 'mute',
-            value: muted[elementId],
-          })
-        }
+        _set((s) => { s.muted[elementId] = !s.muted[elementId] })
+        return get().muted[elementId]
       },
     })),
     { name: 'audio' },

@@ -1,7 +1,7 @@
 // Runtime env injection: docker-entrypoint.sh writes /env-config.js which sets
 // window._env_.OPEN_LIVE_URL so the backend URL can be changed without rebuilding
 // the image (required for OSC parameter store injection).
-const BASE =
+export const BASE =
   (typeof window !== 'undefined' && (window as unknown as { _env_?: { OPEN_LIVE_URL?: string } })._env_?.OPEN_LIVE_URL) ||
   import.meta.env.OPEN_LIVE_URL ||
   'http://localhost:3000'
@@ -25,7 +25,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export type StreamType = 'srt' | 'efp' | 'whip' | 'test1' | 'test2'
+export type StreamType = 'srt' | 'efp' | 'whip' | 'test1' | 'test2' | 'html'
 
 export interface ApiSource {
   id: string
@@ -34,6 +34,7 @@ export interface ApiSource {
   streamType: StreamType
   status: 'active' | 'inactive'
   liveCamera?: boolean
+  latency?: number
 }
 
 export interface ProductionSourceAssignment {
@@ -41,15 +42,52 @@ export interface ProductionSourceAssignment {
   mixerInput: string
 }
 
+export interface ProductionGraphicAssignment {
+  graphicId: string
+  dskInput: string
+}
+
+export type OutputType = 'mpegtssrt' | 'efpsrt' | 'whep'
+
+export interface ApiOutput {
+  id: string
+  name: string
+  outputType: OutputType
+  url?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProductionOutputAssignment {
+  outputId: string
+}
+
 export interface ApiProduction {
   id: string
   name: string
   status: 'active' | 'inactive' | 'activating'
   sources: ProductionSourceAssignment[]
+  graphicAssignments?: ProductionGraphicAssignment[]
+  outputAssignments?: ProductionOutputAssignment[]
+  whepOutputUrls?: Array<{ outputId: string; url: string }>
   templateId?: string
   stromFlowId?: string
   whepEndpoint?: string
   whipEndpoints?: Array<{ mixerInput: string; url: string }>
+  srtOutputUri?: string
+  values?: Record<string, string | number>
+  airTime?: string
+}
+
+export interface TemplateProperty {
+  id: string
+  label: string
+  type: 'select' | 'text' | 'number'
+  default: string | number
+  options?: Array<{ value: string; label: string }>
+  min?: number
+  max?: number
+  unit?: string
 }
 
 export interface ApiTemplate {
@@ -62,6 +100,17 @@ export interface ApiTemplate {
     links: unknown[]
   }
   inputs: Array<{ id: string }>
+  audioElements?: ApiAudioElement[]
+  properties?: TemplateProperty[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProductionConfig {
+  _id: string
+  name: string
+  templateId: string
+  values: Record<string, string | number>
   createdAt: string
   updatedAt: string
 }
@@ -71,10 +120,16 @@ type RawProduction = {
   name: string
   status: 'active' | 'inactive' | 'activating'
   sources: ProductionSourceAssignment[]
+  graphicAssignments?: ProductionGraphicAssignment[]
+  outputAssignments?: ProductionOutputAssignment[]
+  whepOutputUrls?: Array<{ outputId: string; url: string }>
   templateId?: string
   stromFlowId?: string
   whepEndpoint?: string
   whipEndpoints?: Array<{ mixerInput: string; url: string }>
+  srtOutputUri?: string
+  values?: Record<string, string | number>
+  airTime?: string
 }
 
 function normalizeProduction(d: RawProduction): ApiProduction {
@@ -83,10 +138,16 @@ function normalizeProduction(d: RawProduction): ApiProduction {
     name: d.name,
     status: d.status,
     sources: d.sources ?? [],
+    graphicAssignments: d.graphicAssignments ?? [],
+    outputAssignments: d.outputAssignments ?? [],
+    whepOutputUrls: d.whepOutputUrls,
     templateId: d.templateId,
     stromFlowId: d.stromFlowId,
     whepEndpoint: d.whepEndpoint,
     whipEndpoints: d.whipEndpoints,
+    srtOutputUri: d.srtOutputUri,
+    values: d.values,
+    airTime: d.airTime,
   }
 }
 
@@ -105,7 +166,7 @@ export const productionsApi = {
       body: JSON.stringify(body),
     }).then(normalizeProduction),
 
-  update: (id: string, body: { name?: string; templateId?: string | null }) =>
+  update: (id: string, body: { name?: string; templateId?: string | null; values?: Record<string, string | number>; airTime?: string | null }) =>
     request<RawProduction>(`/api/v1/productions/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -130,6 +191,24 @@ export const productionsApi = {
 
   unassignSource: (id: string, mixerInput: string) =>
     request<void>(`/api/v1/productions/${id}/sources/${encodeURIComponent(mixerInput)}`, { method: 'DELETE' }),
+
+  assignGraphic: (id: string, body: ProductionGraphicAssignment) =>
+    request<ProductionGraphicAssignment & { _rev: string }>(`/api/v1/productions/${id}/graphics`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  unassignGraphic: (id: string, dskInput: string) =>
+    request<void>(`/api/v1/productions/${id}/graphics/${encodeURIComponent(dskInput)}`, { method: 'DELETE' }),
+
+  assignOutput: (id: string, outputId: string) =>
+    request<ProductionOutputAssignment & { _rev: string }>(`/api/v1/productions/${id}/outputs`, {
+      method: 'POST',
+      body: JSON.stringify({ outputId }),
+    }),
+
+  unassignOutput: (id: string, outputId: string) =>
+    request<void>(`/api/v1/productions/${id}/outputs/${encodeURIComponent(outputId)}`, { method: 'DELETE' }),
 }
 
 export const sourcesApi = {
@@ -177,6 +256,7 @@ export interface ApiAudioElement {
   blockId: string
   elementId: string
   label: string
+  mixerInput: string | null
 }
 
 export interface ApiStreamingStats {
@@ -207,6 +287,9 @@ export const macrosApi = {
 }
 
 export const audioApi = {
+  discoverElements: (productionId: string) =>
+    request<ApiAudioElement[]>(`/api/v1/productions/${productionId}/audio`),
+
   getElement: (productionId: string, elementId: string) =>
     request<{ element_id: string; properties: Record<string, unknown> }>(
       `/api/v1/productions/${productionId}/audio/${elementId}`,
@@ -227,6 +310,38 @@ export const statsApi = {
 export const iceServersApi = {
   get: () =>
     request<{ iceServers: RTCIceServer[] }>('/api/v1/ice-servers'),
+}
+
+export interface ApiStatus {
+  db: boolean
+  strom: boolean
+}
+
+export const statusApi = {
+  get: () => request<ApiStatus>('/api/v1/status'),
+}
+
+export const productionConfigsApi = {
+  listAll: () =>
+    request<ProductionConfig[]>('/api/v1/production-configs'),
+
+  list: (templateId: string) =>
+    request<ProductionConfig[]>(`/api/v1/production-configs?templateId=${encodeURIComponent(templateId)}`),
+
+  create: (body: { name: string; templateId: string; values: Record<string, string | number> }) =>
+    request<ProductionConfig>('/api/v1/production-configs', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  update: (id: string, body: { name?: string; values?: Record<string, string | number> }) =>
+    request<ProductionConfig>(`/api/v1/production-configs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  remove: (id: string) =>
+    request<void>(`/api/v1/production-configs/${id}`, { method: 'DELETE' }),
 }
 
 export const templatesApi = {
@@ -250,4 +365,52 @@ export const templatesApi = {
 
   remove: (id: string) =>
     request<void>(`/api/v1/templates/${id}`, { method: 'DELETE' }),
+}
+
+export interface ApiGraphic {
+  id: string
+  name: string
+  url: string
+  createdAt: string
+  updatedAt: string
+}
+
+export const graphicsApi = {
+  list: () =>
+    request<ApiGraphic[]>('/api/v1/graphics'),
+
+  create: (body: { name: string; url: string }) =>
+    request<ApiGraphic>('/api/v1/graphics', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  update: (id: string, body: { name?: string; url?: string }) =>
+    request<ApiGraphic>(`/api/v1/graphics/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  remove: (id: string) =>
+    request<void>(`/api/v1/graphics/${id}`, { method: 'DELETE' }),
+}
+
+export const outputsApi = {
+  list: () =>
+    request<ApiOutput[]>('/api/v1/outputs'),
+
+  create: (body: { name: string; outputType: OutputType; url?: string }) =>
+    request<ApiOutput>('/api/v1/outputs', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  update: (id: string, body: { name?: string; url?: string }) =>
+    request<ApiOutput>(`/api/v1/outputs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  remove: (id: string) =>
+    request<void>(`/api/v1/outputs/${id}`, { method: 'DELETE' }),
 }

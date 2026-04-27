@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
-import { productionsApi, type ApiProduction, type ProductionSourceAssignment } from '@/lib/api'
+import { productionsApi, type ApiProduction, type ProductionSourceAssignment, type ProductionGraphicAssignment, type ProductionOutputAssignment } from '@/lib/api'
 
 export type ProductionStatus = 'active' | 'inactive' | 'activating'
 
@@ -13,10 +13,16 @@ export interface Production {
   name: string
   status: ProductionStatus
   sources: ProductionSourceAssignment[]
+  graphicAssignments: ProductionGraphicAssignment[]
+  outputAssignments: ProductionOutputAssignment[]
+  whepOutputUrls?: Array<{ outputId: string; url: string }>
   templateId?: string
   stromFlowId?: string
   whepEndpoint?: string
   whipEndpoints?: Array<{ mixerInput: string; url: string }>
+  srtOutputUri?: string
+  values?: Record<string, string | number>
+  airTime?: string
 }
 
 interface ProductionsState {
@@ -31,8 +37,14 @@ interface ProductionsActions {
   removeProduction: (id: string) => Promise<void>
   updateStatus: (id: string, status: ProductionStatus) => Promise<void>
   updateTemplateId: (id: string, templateId: string | null) => Promise<void>
+  updateValues: (id: string, values: Record<string, string | number>) => Promise<void>
+  updateAirTime: (id: string, airTime: string | null) => Promise<void>
   assignSource: (id: string, assignment: ProductionSourceAssignment) => Promise<void>
   unassignSource: (id: string, mixerInput: string) => Promise<void>
+  assignGraphic: (id: string, assignment: ProductionGraphicAssignment) => Promise<void>
+  unassignGraphic: (id: string, dskInput: string) => Promise<void>
+  assignOutput: (id: string, outputId: string) => Promise<void>
+  unassignOutput: (id: string, outputId: string) => Promise<void>
 }
 
 function fromApi(p: ApiProduction): Production {
@@ -41,10 +53,16 @@ function fromApi(p: ApiProduction): Production {
     name: p.name,
     status: p.status,
     sources: p.sources ?? [],
+    graphicAssignments: p.graphicAssignments ?? [],
+    outputAssignments: p.outputAssignments ?? [],
+    whepOutputUrls: p.whepOutputUrls,
     templateId: p.templateId,
     stromFlowId: p.stromFlowId,
     whepEndpoint: p.whepEndpoint,
     whipEndpoints: p.whipEndpoints,
+    srtOutputUri: p.srtOutputUri,
+    values: p.values,
+    airTime: p.airTime,
   }
 }
 
@@ -112,6 +130,8 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
                   prod.stromFlowId = polled.stromFlowId
                   prod.whepEndpoint = polled.whepEndpoint
                   prod.whipEndpoints = polled.whipEndpoints
+                  prod.whepOutputUrls = polled.whepOutputUrls
+                  prod.srtOutputUri = polled.srtOutputUri
                 }
               })
               if (polled.status === 'activating') {
@@ -135,6 +155,22 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
         })
       },
 
+      updateValues: async (id, values) => {
+        const updated = await productionsApi.update(id, { values })
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (prod) prod.values = updated.values
+        })
+      },
+
+      updateAirTime: async (id, airTime) => {
+        await productionsApi.update(id, { airTime })
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (prod) prod.airTime = airTime ?? undefined
+        })
+      },
+
       assignSource: async (id, assignment) => {
         await productionsApi.assignSource(id, assignment)
         set((state) => {
@@ -154,6 +190,47 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
         set((state) => {
           const prod = state.productions.find((p) => p.id === id)
           if (prod) prod.sources = prod.sources.filter((s) => s.mixerInput !== mixerInput)
+        })
+      },
+
+      assignGraphic: async (id, assignment) => {
+        await productionsApi.assignGraphic(id, assignment)
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (!prod) return
+          const existing = prod.graphicAssignments.findIndex((g) => g.dskInput === assignment.dskInput)
+          if (existing !== -1) {
+            prod.graphicAssignments[existing] = assignment
+          } else {
+            prod.graphicAssignments.push(assignment)
+          }
+        })
+      },
+
+      unassignGraphic: async (id, dskInput) => {
+        await productionsApi.unassignGraphic(id, dskInput)
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (prod) prod.graphicAssignments = prod.graphicAssignments.filter((g) => g.dskInput !== dskInput)
+        })
+      },
+
+      assignOutput: async (id, outputId) => {
+        await productionsApi.assignOutput(id, outputId)
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (!prod) return
+          if (!prod.outputAssignments.some((o) => o.outputId === outputId)) {
+            prod.outputAssignments.push({ outputId })
+          }
+        })
+      },
+
+      unassignOutput: async (id, outputId) => {
+        await productionsApi.unassignOutput(id, outputId)
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (prod) prod.outputAssignments = prod.outputAssignments.filter((o) => o.outputId !== outputId)
         })
       },
     })),

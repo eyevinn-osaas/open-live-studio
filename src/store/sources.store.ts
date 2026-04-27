@@ -13,6 +13,7 @@ export interface Source {
   status: SourceStatus
   color: string
   liveCamera?: boolean
+  latency?: number
 }
 
 interface SourcesState {
@@ -26,6 +27,7 @@ interface SourcesActions {
   refresh: () => Promise<void>
   addSource: (source: Omit<Source, 'id'>) => Promise<void>
   removeSource: (id: string) => Promise<void>
+  updateSource: (id: string, fields: Partial<Pick<Source, 'name' | 'address' | 'latency'>>) => Promise<void>
   updateStatus: (id: string, status: SourceStatus) => Promise<void>
 }
 
@@ -40,6 +42,7 @@ function fromApi(s: ApiSource): Source {
     status: s.status,
     color: SOURCE_COLOR,
     liveCamera: s.liveCamera,
+    latency: s.latency,
   }
 }
 
@@ -87,6 +90,18 @@ export const useSourcesStore = create<SourcesState & SourcesActions>()(
       removeSource: async (id) => {
         await sourcesApi.remove(id)
         set((state) => { state.sources = state.sources.filter((s) => s.id !== id) })
+      },
+
+      updateSource: async (id, fields) => {
+        const updated = await sourcesApi.update(id, fields)
+        set((state) => {
+          const source = state.sources.find((s) => s.id === id)
+          if (source) {
+            if (updated.name !== undefined) source.name = updated.name
+            if (updated.address !== undefined) source.address = updated.address
+            if (updated.latency !== undefined) source.latency = updated.latency
+          }
+        })
       },
 
       updateStatus: async (id, status) => {

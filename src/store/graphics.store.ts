@@ -1,50 +1,61 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { devtools } from 'zustand/middleware'
+import { graphicsApi, type ApiGraphic } from '@/lib/api'
 
-export type OverlayType = 'lower-third' | 'full-screen' | 'bug'
-
-export interface GraphicOverlay {
-  id: string
-  name: string
-  type: OverlayType
-  fields: Record<string, string>
-}
+export type { ApiGraphic as Graphic }
 
 interface GraphicsState {
-  overlays: GraphicOverlay[]
-  activeOverlayIds: string[]
+  graphics: ApiGraphic[]
+  lastFetchedAt: number
+  isLoading: boolean
 }
 
 interface GraphicsActions {
-  toggleOverlay: (id: string) => void
-  updateField: (id: string, field: string, value: string) => void
-  isActive: (id: string) => boolean
+  fetchAll: () => Promise<void>
+  addGraphic: (body: { name: string; url: string }) => Promise<void>
+  updateGraphic: (id: string, body: { name?: string; url?: string }) => Promise<void>
+  removeGraphic: (id: string) => Promise<void>
 }
 
 export const useGraphicsStore = create<GraphicsState & GraphicsActions>()(
   devtools(
-    immer((set, get) => ({
-      overlays: [],
-      activeOverlayIds: [],
+    immer((set) => ({
+      graphics: [],
+      lastFetchedAt: Date.now(),
+      isLoading: false,
 
-      toggleOverlay: (id) =>
+      fetchAll: async () => {
+        set((state) => { state.isLoading = true })
+        try {
+          const data = await graphicsApi.list()
+          set((state) => {
+            state.graphics = data
+            state.isLoading = false
+            state.lastFetchedAt = Date.now()
+          })
+        } catch {
+          set((state) => { state.isLoading = false })
+        }
+      },
+
+      addGraphic: async (body) => {
+        const created = await graphicsApi.create(body)
+        set((state) => { state.graphics.push(created) })
+      },
+
+      updateGraphic: async (id, body) => {
+        const updated = await graphicsApi.update(id, body)
         set((state) => {
-          const idx = state.activeOverlayIds.indexOf(id)
-          if (idx >= 0) {
-            state.activeOverlayIds.splice(idx, 1)
-          } else {
-            state.activeOverlayIds.push(id)
-          }
-        }),
+          const idx = state.graphics.findIndex((g) => g.id === id)
+          if (idx >= 0) state.graphics[idx] = updated
+        })
+      },
 
-      updateField: (id, field, value) =>
-        set((state) => {
-          const overlay = state.overlays.find((o) => o.id === id)
-          if (overlay) overlay.fields[field] = value
-        }),
-
-      isActive: (id) => get().activeOverlayIds.includes(id),
+      removeGraphic: async (id) => {
+        await graphicsApi.remove(id)
+        set((state) => { state.graphics = state.graphics.filter((g) => g.id !== id) })
+      },
     })),
     { name: 'graphics' },
   ),
