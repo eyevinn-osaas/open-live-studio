@@ -55,7 +55,7 @@ function SourceCell({
 
 export function SourceBusDual() {
   const sources = useSourcesStore(useShallow((s) => s.sources))
-  const { pgmInput: pgmSourceId, pvwInput: pvwSourceId, setPvw, cut } = useProductionStore()
+  const { pgmInput, pvwInput, setPvw, cut } = useProductionStore()
 
   if (sources.length === 0) {
     return (
@@ -75,7 +75,7 @@ export function SourceBusDual() {
             <SourceCell
               key={src.id}
               sourceId={src.id}
-              role={src.id === pvwSourceId ? 'pvw' : 'off'}
+              role={src.id === pvwInput ? 'pvw' : 'off'}
               onClick={() => setPvw(src.id)}
             />
           ))}
@@ -89,7 +89,7 @@ export function SourceBusDual() {
             <SourceCell
               key={src.id}
               sourceId={src.id}
-              role={src.id === pgmSourceId ? 'pgm' : 'off'}
+              role={src.id === pgmInput ? 'pgm' : 'off'}
               onClick={() => { setPvw(src.id); cut() }}
             />
           ))}

@@ -12,12 +12,23 @@ interface PageHeaderProps {
 export function PageHeader({ title, subtitle, center, actions, className }: PageHeaderProps) {
   return (
     <div className={cn(
-      'flex items-center justify-between px-6 h-14 border-b border-[--color-border] flex-shrink-0',
+      'flex items-center justify-between px-4 h-11 border-b border-zinc-800 flex-shrink-0 bg-black',
       className,
     )}>
-      <div>
-        <h1 className="text-xl font-bold text-[--color-text-primary]">{title}</h1>
-        {subtitle && <p className="text-xs text-[--color-text-muted] mt-0.5">{subtitle}</p>}
+      <div className="flex items-center gap-3">
+        {/* Brand mark */}
+        <div className="flex items-center gap-2 pr-3 border-r border-zinc-800">
+          <div className="w-2 h-2 bg-orange-500 rounded-none" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-500">Open Live</span>
+        </div>
+        <div>
+          {typeof title === 'string' ? (
+            <h1 className="text-[11px] font-bold uppercase tracking-[0.12em] text-white">{title}</h1>
+          ) : (
+            title
+          )}
+          {subtitle && <p className="text-[9px] uppercase tracking-widest text-zinc-500 mt-0">{subtitle}</p>}
+        </div>
       </div>
       {center && <div className="flex items-center gap-6">{center}</div>}
       {actions && <div className="flex items-center gap-3">{actions}</div>}

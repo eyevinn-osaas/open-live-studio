@@ -22,9 +22,12 @@ export function DskPanel({ onToggle }: DskPanelProps) {
   if (assignments.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-2 p-3 bg-[--color-surface-3] rounded-xl border border-[--color-border]">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-[--color-text-muted]">DSK</span>
-      <div className="flex gap-2">
+    <div className="flex items-stretch border border-zinc-800 bg-zinc-950">
+      {/* Section label */}
+      <div className="flex items-center px-2 border-r border-zinc-800">
+        <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-500">DSK</span>
+      </div>
+      <div className="flex gap-px flex-1 p-1">
         {assignments.map((a) => {
           const dskMatch = /dsk_in_(\d+)$/.exec(a.dskInput)
           if (!dskMatch) return null
@@ -38,17 +41,15 @@ export function DskPanel({ onToggle }: DskPanelProps) {
               key={a.dskInput}
               onClick={() => onToggle(layer, !active)}
               className={cn(
-                'flex-1 py-2 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border flex flex-col items-center gap-0.5',
+                'btn-hardware flex-1 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors flex flex-col items-center gap-0',
                 active
-                  ? 'bg-violet-600 text-white border-violet-600'
-                  : 'bg-[--color-surface-raised] text-[--color-text-muted] border-[--color-border] hover:border-[--color-border-strong]',
+                  ? 'bg-orange-500 text-black border-orange-400'
+                  : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-white hover:border-zinc-500',
               )}
             >
-              <div className="flex items-center gap-1.5">
-                <span>{label}</span>
-              </div>
+              <span>{label}</span>
               {graphic && (
-                <span className={cn('text-[9px] font-normal normal-case truncate max-w-full', active ? 'text-white/70' : 'text-[--color-text-muted]')}>
+                <span className={cn('text-[8px] font-normal normal-case truncate max-w-full mt-0.5', active ? 'text-black/70' : 'text-zinc-600')}>
                   {graphic.name}
                 </span>
               )}
