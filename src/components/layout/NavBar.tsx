@@ -4,15 +4,14 @@ import { useProductionStore } from '@/store/production.store'
 import { ConnectionStatus } from '@/components/ui/ConnectionStatus'
 
 function OpenLiveLogo() {
-  // Expanded viewBox (-2 -2 40 40) gives 2px breathing room so the circle stroke isn't clipped.
-  // Play triangle shifted 1px right for optical centering (play shapes read left-heavy).
-  // Red dot sits on the circumference at 45° top-right: (18+15.5·cos45°, 18−15.5·sin45°) ≈ (29,7).
   return (
-    <svg width="34" height="34" viewBox="-2 -2 40 40" fill="none" aria-label="Open Live">
-      <circle cx="18" cy="18" r="15.5" stroke="var(--color-accent)" strokeWidth="1.5" />
-      <path d="M16 12.5L27.5 18L16 23.5V12.5Z" fill="var(--color-accent)" />
-      <circle cx="29" cy="7" r="3.5" fill="var(--color-live)" />
-    </svg>
+    <div className="flex items-center gap-2" aria-label="Open Live">
+      <div className="w-2.5 h-2.5 bg-orange-500 shrink-0" />
+      <div className="flex flex-col" style={{ lineHeight: 1.1 }}>
+        <span className="text-[9px] font-bold tracking-[0.2em] text-orange-500">OPEN</span>
+        <span className="text-[9px] font-bold tracking-[0.2em] text-orange-500">LIVE</span>
+      </div>
+    </div>
   )
 }
 

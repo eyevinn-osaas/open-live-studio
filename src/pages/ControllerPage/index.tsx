@@ -279,24 +279,9 @@ export function ControllerPage() {
       <PageHeader
         title={
           <div className="flex items-center gap-3">
-            {/* Production selector — broadcast-style dropdown */}
-            <div className="relative inline-flex items-center">
-              <select
-                value={activeProductionId ?? ''}
-                onChange={(e) => setActiveProduction(e.target.value || null)}
-                className="broadcast-select h-8"
-              >
-                <option value="">— NO PRODUCTION —</option>
-                {productions.filter((p) => p.status === 'active' || p.status === 'activating').map((p) => (
-                  <option key={p.id} value={p.id} disabled={p.status === 'activating'}>
-                    {p.name.toUpperCase()}{p.status === 'activating' ? ' [STARTING]' : ''}
-                  </option>
-                ))}
-              </select>
-              <svg className="pointer-events-none absolute right-1.5 w-3 h-3 text-zinc-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white">
+              {activeProduction?.name ?? 'Studio'}
+            </span>
             {/* Panel toggle icons */}
             {PANEL_ICONS.map(({ key, Icon }) => (
               <button
@@ -384,6 +369,7 @@ export function ControllerPage() {
           <div className={`flex pt-2 pb-3 gap-0 ${panels.multiviewer ? 'flex-none' : 'flex-1 min-h-0 overflow-auto'}`}>
             {panels.controller && (
               <div className={`px-3 flex flex-col gap-2 ${panels.audio ? 'w-[70%]' : 'flex-1'}`}>
+                <SectionLabel icon={<ControllerIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/controller?production=${activeProductionId}`, '_blank', 'noopener'); togglePanel('controller') } : undefined}>Controller</SectionLabel>
                 <TransitionPanel onCut={handleCut} onAuto={handleAuto} onFtb={handleFtb} onSelectPvw={handleSelectPvw} onSetOvl={handleSetOvl} />
                 <DskPanel onToggle={handleDskToggle} />
                 {false && activeProductionId && (
@@ -393,6 +379,7 @@ export function ControllerPage() {
             )}
             {panels.audio && (
               <div className={`flex flex-col gap-2 ${panels.controller ? 'w-[30%] pr-3' : 'flex-1 px-3'}`}>
+                <SectionLabel icon={<AudioIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/audio?production=${activeProductionId}`, '_blank', 'noopener'); togglePanel('audio') } : undefined}>Audio</SectionLabel>
                 <AudioPanel send={send} />
               </div>
             )}
