@@ -68,6 +68,20 @@ function VuMeter({ elementId }: { elementId: string }) {
   )
 }
 
+// ── Fader taper ───────────────────────────────────────────────────────────────
+// Broadcast-standard log taper: pos 1.0 → 0 dB, pos 0.75 → −10 dB, pos 0.5 → −20 dB.
+// Formula: volume = 0.01^(1−pos)  ↔  pos = 1 + log10(volume) / 2
+
+function faderToVolume(pos: number): number {
+  if (pos <= 0) return 0
+  return Math.pow(0.01, 1 - pos)
+}
+
+function volumeToFader(vol: number): number {
+  if (vol <= 0) return 0
+  return Math.max(0, 1 + Math.log10(vol) / 2)
+}
+
 // ── Channel strip ─────────────────────────────────────────────────────────────
 
 function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }: { elementId: string; label: string; send: SendFn; showMute?: boolean; isPgm?: boolean }) {
@@ -79,11 +93,12 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
   const throttleRef = useRef<{ timer: ReturnType<typeof setTimeout>; last: number } | null>(null)
   const atFloorRef = useRef(false)
 
-  const handleChange = useCallback((value: number) => {
-    setLevel(elementId, value)
+  const handleChange = useCallback((faderPos: number) => {
+    const volume = faderToVolume(faderPos)
+    setLevel(elementId, volume)
 
     // Auto-mute when fader hits floor, auto-unmute when it leaves
-    const nowAtFloor = value <= 0.02
+    const nowAtFloor = faderPos <= 0.02
     if (nowAtFloor && !atFloorRef.current) {
       atFloorRef.current = true
       if (!muted) {
@@ -99,14 +114,14 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
     }
 
     if (throttleRef.current) {
-      throttleRef.current.last = value
+      throttleRef.current.last = volume
       return
     }
-    send({ type: 'AUDIO_SET', elementId, property: 'volume', value })
-    const entry = { timer: null as unknown as ReturnType<typeof setTimeout>, last: value }
+    send({ type: 'AUDIO_SET', elementId, property: 'volume', value: volume })
+    const entry = { timer: null as unknown as ReturnType<typeof setTimeout>, last: volume }
     entry.timer = setTimeout(() => {
       throttleRef.current = null
-      if (entry.last !== value) {
+      if (entry.last !== volume) {
         send({ type: 'AUDIO_SET', elementId, property: 'volume', value: entry.last })
       }
     }, 150)
@@ -172,7 +187,7 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
         <div className="flex items-center justify-start">
           {/* Outer wrapper: 44px wide × FADER_H tall — input is rotated inside */}
           <div className="relative overflow-visible" style={{ width: 44, height: FADER_H }}>
-            {/* Dotted centre track */}
+            {/* Dotted centre track — behind fader */}
             <div
               className="absolute pointer-events-none"
               style={{
@@ -184,28 +199,10 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
                 backgroundImage: 'repeating-linear-gradient(to bottom, #4b5563 0, #4b5563 3px, transparent 3px, transparent 7px)',
               }}
             />
-            {/* Horizontal input rotated -90deg: width=FADER_H (travel), height=44 (container fit) */}
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.005}
-              value={level}
-              onChange={(e) => handleChange(parseFloat(e.target.value))}
-              aria-label={`${label} fader`}
-              className="fader-rotated"
-              style={{
-                width: FADER_H,
-                height: 44,
-                left: -(FADER_H - 44) / 2,
-                top: (FADER_H - 44) / 2,
-                cursor: muted ? 'not-allowed' : 'pointer',
-              }}
-            />
-            {/* Tick marks to the right of centre track, within the 44px container */}
+            {/* Tick marks — behind fader */}
             <div
               className="absolute flex flex-col justify-between pointer-events-none"
-              style={{ left: 25, top: 0, height: FADER_H }}
+              style={{ left: 25, top: 0, height: FADER_H, zIndex: 0 }}
             >
               {Array.from({ length: TICK_COUNT }).map((_, i) => (
                 <div
@@ -218,6 +215,25 @@ function ChannelStrip({ elementId, label, send, showMute = true, isPgm = false }
                 />
               ))}
             </div>
+            {/* Horizontal input rotated -90deg — on top of ticks */}
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.005}
+              value={volumeToFader(level)}
+              onChange={(e) => handleChange(parseFloat(e.target.value))}
+              aria-label={`${label} fader`}
+              className="fader-rotated"
+              style={{
+                width: FADER_H,
+                height: 44,
+                left: -(FADER_H - 44) / 2,
+                top: (FADER_H - 44) / 2,
+                cursor: muted ? 'not-allowed' : 'pointer',
+                zIndex: 1,
+              }}
+            />
           </div>
         </div>
       </div>
@@ -254,28 +270,26 @@ export function AudioPanel({ send }: { send: SendFn }) {
   const hasContent = elements.length > 0
 
   return (
-    <div className="bg-[--color-surface-3] rounded-xl border border-[--color-border] ml-4 overflow-hidden">
+    <div className="bg-[--color-surface-3] rounded-xl border border-[--color-border] ml-4 overflow-hidden flex items-stretch w-fit">
       {!hasContent ? (
         <div className="flex items-center justify-center min-h-[160px] px-4">
           <p className="text-[10px] text-zinc-600 text-center">No channels available</p>
         </div>
       ) : (
-        <div className="flex items-stretch">
-          {/* OUTPUTS label — left side */}
-          <div
-            className="flex items-center justify-center shrink-0"
-            style={{ width: 18, background: 'rgba(89,203,232,0.15)' }}
-          >
-            <span
-              className="text-[9px] font-bold tracking-widest uppercase whitespace-nowrap"
-              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: '#59cbe8' }}
+        <>
+          {/* Fixed: OUTPUTS label + MAIN strip */}
+          <div className="flex items-stretch shrink-0">
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{ width: 18, background: 'rgba(89,203,232,0.15)' }}
             >
-              OUTPUTS
-            </span>
-          </div>
-
-          {/* MAIN output strip */}
-          <div className="flex overflow-x-auto">
+              <span
+                className="text-[9px] font-bold tracking-widest uppercase whitespace-nowrap"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', color: '#59cbe8' }}
+              >
+                OUTPUTS
+              </span>
+            </div>
             {mainElement ? (
               <ChannelStrip elementId="main" label="MAIN" send={send} />
             ) : (
@@ -285,23 +299,7 @@ export function AudioPanel({ send }: { send: SendFn }) {
             )}
           </div>
 
-          {/* Divider between outputs and inputs */}
-          <div className="w-px bg-zinc-700 shrink-0" />
-
-          {/* Input strips */}
-          <div className="flex overflow-x-auto [&>*:last-child]:border-r-0">
-            {inputElements.length === 0 ? (
-              <div className="flex items-center justify-center px-3" style={{ minWidth: 60 }}>
-                <p className="text-[10px] text-zinc-600 text-center">No inputs</p>
-              </div>
-            ) : (
-              inputElements.map((el) => (
-                <ChannelStrip key={el.elementId} elementId={el.elementId} label={el.label} send={send} isPgm={!!pgmInput && el.mixerInput === pgmInput} />
-              ))
-            )}
-          </div>
-
-          {/* INPUTS label — right side */}
+          {/* Fixed: INPUTS separator */}
           <div
             className="flex items-center justify-center shrink-0"
             style={{ width: 18, background: 'rgba(22,163,74,0.2)' }}
@@ -313,7 +311,22 @@ export function AudioPanel({ send }: { send: SendFn }) {
               INPUTS
             </span>
           </div>
-        </div>
+
+          {/* Scrollable: input strips */}
+          <div className="flex items-stretch overflow-x-auto">
+            <div className="flex [&>*:last-child]:border-r-0">
+              {inputElements.length === 0 ? (
+                <div className="flex items-center justify-center px-3" style={{ minWidth: 60 }}>
+                  <p className="text-[10px] text-zinc-600 text-center">No inputs</p>
+                </div>
+              ) : (
+                inputElements.map((el) => (
+                  <ChannelStrip key={el.elementId} elementId={el.elementId} label={el.label} send={send} isPgm={!!pgmInput && el.mixerInput === pgmInput} />
+                ))
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

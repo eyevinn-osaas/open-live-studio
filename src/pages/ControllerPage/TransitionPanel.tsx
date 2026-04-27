@@ -82,7 +82,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
             onClick={onCut}
             className="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest bg-red-600 border border-white text-white hover:opacity-90 transition-opacity"
           >
-            CUT
+            TAKE
           </button>
           <button
             onClick={onAuto}
@@ -195,7 +195,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl }:
             step={100}
             value={transitionDurationMs}
             onChange={(e) => setTransitionDuration(Number(e.target.value))}
-            className="w-14 px-2 py-1 rounded border border-[--color-border-strong] bg-[--color-surface-raised] text-[10px] font-mono text-[--color-text-primary] text-right focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+            className="w-[61px] px-2 py-1 rounded border border-[--color-border-strong] bg-[--color-surface-raised] text-[10px] font-mono text-[--color-text-primary] text-right focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
           />
         </div>
       </div>

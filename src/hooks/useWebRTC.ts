@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useViewerStore } from '@/store/viewer.store'
 import { WhepClient } from '@/lib/webrtc'
 import { getApiToken } from '@/lib/sat'
@@ -24,13 +24,13 @@ export function useWebRTC(whepEndpoint?: string | null): void {
   const setRetryCountdown = useViewerStore((s) => s.setRetryCountdown)
   const disconnect = useViewerStore((s) => s.disconnect)
   const clientRef = useRef<WhepClient | null>(null)
-  const [authToken, setAuthToken] = useState<string | undefined>(undefined)
 
   useEffect(() => {
-    getApiToken().then(setAuthToken).catch(() => {})
-  }, [])
+    if (!whepEndpoint) {
+      disconnect()
+      return
+    }
 
-  useEffect(() => {
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
     let countdownTimer: ReturnType<typeof setInterval> | null = null
@@ -50,8 +50,12 @@ export function useWebRTC(whepEndpoint?: string | null): void {
       }, 1000)
     }
 
+    // authToken is resolved once per endpoint mount — not reactive state,
+    // so token resolution never triggers a second connect cycle.
+    let authToken: string | undefined
+
     const connect = () => {
-      if (cancelled || !whepEndpoint) return
+      if (cancelled) return
       setConnectionState('connecting')
       const client = new WhepClient(whepEndpoint, {
         onVideoTrack: (stream) => {
@@ -74,11 +78,14 @@ export function useWebRTC(whepEndpoint?: string | null): void {
       void client.connect()
     }
 
-    if (whepEndpoint) {
-      connect()
-    } else {
-      disconnect()
-    }
+    // Fetch token once, then connect. Retries reuse the same token variable.
+    getApiToken()
+      .catch(() => undefined)
+      .then((token) => {
+        if (cancelled) return
+        authToken = token
+        connect()
+      })
 
     return () => {
       cancelled = true
@@ -92,5 +99,5 @@ export function useWebRTC(whepEndpoint?: string | null): void {
         disconnect()
       }
     }
-  }, [whepEndpoint, authToken, setProgramStream, setConnectionState, setRetryCountdown, disconnect])
+  }, [whepEndpoint, setProgramStream, setConnectionState, setRetryCountdown, disconnect])
 }
