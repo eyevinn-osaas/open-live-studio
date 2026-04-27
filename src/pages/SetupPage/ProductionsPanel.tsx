@@ -1019,7 +1019,7 @@ function InlineCopyButton({ label, value }: { label: string; value: string }) {
       type="button"
       onClick={handleCopy}
       title={value}
-      className="relative -top-0.5 inline-flex items-center gap-1 shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] border border-[--color-border] text-[--color-text-muted] hover:text-[--color-accent] hover:border-[--color-accent]/40 transition-colors cursor-pointer"
+      className="relative -top-0.5 inline-flex items-center gap-1 shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] border border-[--color-border] text-[--color-text-muted] hover:text-orange-500 hover:border-[--color-accent]/40 transition-colors cursor-pointer"
     >
       {copied ? (
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1053,7 +1053,7 @@ function EndpointRow({ label, url }: { label: string; url: string }) {
       <button
         type="button"
         onClick={handleCopy}
-        className="text-xs text-[--color-text-muted] hover:text-[--color-text-primary] transition-colors shrink-0"
+        className="text-xs text-[--color-text-muted] hover:text-orange-500 transition-colors shrink-0"
         title={`Copy ${label} URI`}
       >
         {copied ? '✓' : '⎘'}
@@ -1082,7 +1082,7 @@ function WhipEndpointRow({ mixerInput, url }: { mixerInput: string; url: string 
       <button
         type="button"
         onClick={handleCopy}
-        className="text-xs text-[--color-text-muted] hover:text-[--color-text-primary] transition-colors shrink-0"
+        className="text-xs text-[--color-text-muted] hover:text-orange-500 transition-colors shrink-0"
         title="Copy WHIP endpoint URL"
       >
         {copied ? '✓' : '⎘'}

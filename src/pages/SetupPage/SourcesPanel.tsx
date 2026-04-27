@@ -47,10 +47,11 @@ const STREAM_TYPE_ADDRESS_PLACEHOLDER: Partial<Record<StreamType, string>> = {
 const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'html']
 
 export function SourcesPanel() {
-  const { sources, isLoading, lastFetchedAt, removeSource, addSource } = useSourcesStore()
+  const { sources, isLoading, lastFetchedAt, removeSource, addSource, updateSource } = useSourcesStore()
   const productions = useProductionsStore((s) => s.productions)
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string; address: string; latency: number } | null>(null)
   const [newName, setNewName] = useState('')
   const [newAddress, setNewAddress] = useState('')
   const [newStreamType, setNewStreamType] = useState<StreamType>('srt')
@@ -80,6 +81,16 @@ export function SourcesPanel() {
     setAddOpen(false)
   }
 
+  function handleEdit() {
+    if (!editTarget || !editTarget.name.trim()) return
+    void updateSource(editTarget.id, {
+      name: editTarget.name.trim(),
+      address: editTarget.address.trim(),
+      latency: editTarget.latency,
+    })
+    setEditTarget(null)
+  }
+
   const deleteTarget = deleteTargetId ? sources.find((s) => s.id === deleteTargetId) : null
 
   return (
@@ -100,7 +111,11 @@ export function SourcesPanel() {
           return (
             <div
               key={src.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded bg-[--color-surface-3] border border-[--color-border] hover:border-zinc-600 transition-colors"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded bg-[--color-surface-3] border transition-colors ${
+                inActiveProduction
+                  ? 'border-[--color-border] hover:border-zinc-600 cursor-not-allowed'
+                  : 'border-[--color-border] hover:border-orange-500 cursor-pointer'
+              }`}
             >
               <StatusDot color={inActiveProduction ? 'red' : 'gray'} />
               <div className="flex-1 min-w-0">
@@ -109,6 +124,9 @@ export function SourcesPanel() {
                   <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] text-[--color-text-muted] uppercase">
                     {STREAM_TYPE_LABELS[src.streamType]}
                   </span>
+                  {inActiveProduction && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-900/50 text-red-400 uppercase tracking-wide">LIVE</span>
+                  )}
                 </div>
                 {STREAM_TYPE_HAS_ADDRESS[src.streamType] && (
                   <span className="text-xs text-[--color-text-muted] font-mono truncate block">
@@ -122,10 +140,20 @@ export function SourcesPanel() {
               <Button
                 size="sm"
                 variant="ghost"
+                onClick={() => !inActiveProduction && setEditTarget({ id: src.id, name: src.name, address: src.address ?? '', latency: src.latency ?? 125 })}
+                disabled={inActiveProduction}
+                className="text-white hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                title={inActiveProduction ? 'Cannot edit source in an active production' : 'Edit source'}
+              >
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
                 onClick={() => setDeleteTargetId(src.id)}
                 disabled={inActiveProduction}
-                className="text-white hover:text-red-400"
-                title={inActiveProduction ? 'Source is in an active production' : 'Delete source'}
+                className="text-white hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                title={inActiveProduction ? 'Cannot delete source in an active production' : 'Delete source'}
               >
                 Delete
               </Button>
@@ -157,6 +185,46 @@ export function SourcesPanel() {
         </Modal>
       )}
 
+      {/* Edit modal */}
+      {editTarget && (
+        <Modal open title="Edit Source" onClose={() => setEditTarget(null)}>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Name</label>
+              <input
+                type="text"
+                value={editTarget.name}
+                onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Address</label>
+              <input
+                type="text"
+                value={editTarget.address}
+                onChange={(e) => setEditTarget({ ...editTarget, address: e.target.value })}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Latency (ms)</label>
+              <input
+                type="number"
+                min={0}
+                value={editTarget.latency}
+                onChange={(e) => setEditTarget({ ...editTarget, latency: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={() => setEditTarget(null)}>Cancel</Button>
+              <Button variant="active" onClick={handleEdit} disabled={!editTarget.name.trim()}>Save</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       <Modal open={addOpen} title="Add Source" onClose={() => setAddOpen(false)}>
         <div className="flex flex-col gap-3">
           <div>
@@ -180,7 +248,7 @@ export function SourcesPanel() {
                   className={`py-2 rounded text-sm border transition-colors ${
                     newStreamType === t
                       ? 'bg-[var(--color-accent)] border-[var(--color-accent)] text-white'
-                      : 'bg-[var(--color-surface-2)] border-[var(--color-border-strong)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                      : 'bg-[var(--color-surface-2)] border-[var(--color-border-strong)] text-[var(--color-text-muted)] hover:text-orange-500'
                   }`}
                 >
                   {STREAM_TYPE_LABELS[t]}

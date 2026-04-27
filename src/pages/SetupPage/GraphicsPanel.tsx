@@ -63,7 +63,11 @@ export function GraphicsPanel() {
           return (
             <div
               key={g.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded bg-[--color-surface-3] border border-[--color-border] hover:border-zinc-600 transition-colors"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded bg-[--color-surface-3] border transition-colors ${
+                inActiveProduction
+                  ? 'border-[--color-border] hover:border-zinc-600 cursor-not-allowed'
+                  : 'border-[--color-border] hover:border-orange-500 cursor-pointer'
+              }`}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -71,14 +75,19 @@ export function GraphicsPanel() {
                   <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] text-[--color-text-muted] uppercase">
                     DSK
                   </span>
+                  {inActiveProduction && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-900/50 text-red-400 uppercase tracking-wide">LIVE</span>
+                  )}
                 </div>
                 <span className="text-xs text-[--color-text-muted] font-mono truncate block">{g.url}</span>
               </div>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setEditTarget({ id: g.id, name: g.name, url: g.url })}
-                className="text-white hover:text-[--color-accent]"
+                onClick={() => !inActiveProduction && setEditTarget({ id: g.id, name: g.name, url: g.url })}
+                disabled={inActiveProduction}
+                className="text-white hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                title={inActiveProduction ? 'Cannot edit graphic in an active production' : 'Edit graphic'}
               >
                 Edit
               </Button>
@@ -87,7 +96,7 @@ export function GraphicsPanel() {
                 variant="ghost"
                 onClick={() => setDeleteTargetId(g.id)}
                 disabled={inActiveProduction}
-                className="text-white hover:text-red-400"
+                className="text-white hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
                 title={inActiveProduction ? 'Graphic is in an active production' : 'Delete graphic'}
               >
                 Delete

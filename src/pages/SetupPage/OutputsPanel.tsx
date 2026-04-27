@@ -89,7 +89,11 @@ export function OutputsPanel() {
           return (
             <div
               key={o.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded bg-[--color-surface-3] border border-[--color-border] hover:border-zinc-600 transition-colors"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded bg-[--color-surface-3] border transition-colors ${
+                inActiveProd
+                  ? 'border-[--color-border] hover:border-zinc-600 cursor-not-allowed'
+                  : 'border-[--color-border] hover:border-orange-500 cursor-pointer'
+              }`}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -97,12 +101,22 @@ export function OutputsPanel() {
                   <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] text-[--color-text-muted] uppercase">
                     {OUTPUT_TYPE_LABELS[o.outputType]}
                   </span>
+                  {inActiveProd && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-900/50 text-red-400 uppercase tracking-wide">LIVE</span>
+                  )}
                 </div>
                 {o.url && (
                   <span className="text-xs text-[--color-text-muted] font-mono truncate block">{o.url}</span>
                 )}
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setEditTarget({ id: o.id, name: o.name, url: o.url ?? '' })} className="text-white hover:text-[--color-accent]">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => !inActiveProd && setEditTarget({ id: o.id, name: o.name, url: o.url ?? '' })}
+                disabled={inActiveProd}
+                className="text-white hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                title={inActiveProd ? 'Cannot edit output in an active production' : 'Edit output'}
+              >
                 Edit
               </Button>
               <Button
@@ -110,7 +124,7 @@ export function OutputsPanel() {
                 variant="ghost"
                 onClick={() => { setDeleteError(null); setDeleteTargetId(o.id) }}
                 disabled={inActiveProd}
-                className="text-white hover:text-red-400"
+                className="text-white hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
                 title={inActiveProd ? 'Output is in an active production' : 'Delete output'}
               >
                 Delete
@@ -165,7 +179,7 @@ export function OutputsPanel() {
                   className={`py-2 rounded text-sm border transition-colors ${
                     newType === t
                       ? 'bg-[var(--color-accent)] border-[var(--color-accent)] text-white'
-                      : 'bg-[var(--color-surface-2)] border-[var(--color-border-strong)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                      : 'bg-[var(--color-surface-2)] border-[var(--color-border-strong)] text-[var(--color-text-muted)] hover:text-orange-500'
                   }`}
                 >
                   {OUTPUT_TYPE_LABELS[t]}

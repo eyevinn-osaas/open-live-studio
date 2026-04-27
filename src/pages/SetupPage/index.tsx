@@ -30,10 +30,10 @@ export function SetupPage() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer',
               activeTab === tab.id
                 ? 'border-[--color-accent] text-[--color-text-primary]'
-                : 'border-transparent text-[--color-text-muted] hover:text-[--color-text-primary]',
+                : 'border-transparent text-[--color-text-muted] hover:text-orange-500',
             )}
           >
             {tab.label}
