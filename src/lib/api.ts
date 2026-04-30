@@ -77,6 +77,7 @@ export interface ApiProduction {
   srtOutputUri?: string
   values?: Record<string, string | number>
   airTime?: string
+  deletionWarnings?: Array<{ type: 'source' | 'graphic' | 'output'; name: string }>
 }
 
 export interface TemplateProperty {
@@ -130,6 +131,7 @@ type RawProduction = {
   srtOutputUri?: string
   values?: Record<string, string | number>
   airTime?: string
+  deletionWarnings?: Array<{ type: 'source' | 'graphic' | 'output'; name: string }>
 }
 
 function normalizeProduction(d: RawProduction): ApiProduction {
@@ -148,6 +150,7 @@ function normalizeProduction(d: RawProduction): ApiProduction {
     srtOutputUri: d.srtOutputUri,
     values: d.values,
     airTime: d.airTime,
+    deletionWarnings: d.deletionWarnings,
   }
 }
 

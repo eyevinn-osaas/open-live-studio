@@ -50,8 +50,13 @@ export function OutputsPanel() {
     setAddUrlError(null)
   }
 
+  function isValidSrtUrl(s: string): boolean {
+    return /^srt:\/\/[^?#]*:\d+/.test(s.trim())
+  }
+
   async function handleAdd() {
     if (!newName.trim() || !newUrl.trim()) return
+    if (!isValidSrtUrl(newUrl.trim())) { setAddUrlError('Must be a valid srt:// URI'); return }
     const duplicate = outputs.find((o) => o.url?.trim() === newUrl.trim())
     if (duplicate) { setAddUrlError(`Address already used by "${duplicate.name}"`); return }
     await addOutput({ name: newName.trim(), outputType: newType, url: newUrl.trim() })
@@ -63,10 +68,12 @@ export function OutputsPanel() {
     if (!editTarget || !editTarget.name.trim()) return
     const url = editTarget.url.trim()
     if (url) {
+      if (!isValidSrtUrl(url)) { setEditUrlError('Must be a valid srt:// URI'); return }
       const duplicate = outputs.find((o) => o.id !== editTarget.id && o.url?.trim() === url)
       if (duplicate) { setEditUrlError(`Address already used by "${duplicate.name}"`); return }
     }
     await updateOutput(editTarget.id, { name: editTarget.name.trim(), url: url || undefined })
+    setEditUrlError(null)
     setEditTarget(null)
   }
 
@@ -91,7 +98,7 @@ export function OutputsPanel() {
           </span>
           {isLoading && <span className="text-xs text-[--color-accent]">Refreshing…</span>}
         </div>
-        <Button size="sm" variant="active" onClick={() => setAddOpen(true)}>+ Add Output</Button>
+        <Button size="sm" variant="active" onClick={() => setAddOpen(true)}>+ New Output</Button>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -166,7 +173,7 @@ export function OutputsPanel() {
       )}
 
       {/* Add modal */}
-      <Modal open={addOpen} title="Add Output" onClose={() => { resetAdd(); setAddOpen(false) }}>
+      <Modal open={addOpen} title="New Output" onClose={() => { resetAdd(); setAddOpen(false) }}>
         <div className="flex flex-col gap-3">
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Name</label>
@@ -211,7 +218,7 @@ export function OutputsPanel() {
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => { resetAdd(); setAddOpen(false) }}>Cancel</Button>
             <Button variant="active" onClick={() => void handleAdd()} disabled={!newName.trim() || !newUrl.trim()}>
-              Add Output
+              Save
             </Button>
           </div>
         </div>
