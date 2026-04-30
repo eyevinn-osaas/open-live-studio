@@ -51,11 +51,13 @@ export function SourcesPanel() {
   const productions = useProductionsStore((s) => s.productions)
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
-  const [editTarget, setEditTarget] = useState<{ id: string; name: string; address: string; latency: number } | null>(null)
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string; address: string; latency: string; streamType: StreamType } | null>(null)
   const [newName, setNewName] = useState('')
   const [newAddress, setNewAddress] = useState('')
   const [newStreamType, setNewStreamType] = useState<StreamType>('srt')
-  const [newLatency, setNewLatency] = useState<number>(125)
+  const [newLatency, setNewLatency] = useState('')
+  const [addAddressError, setAddAddressError] = useState<string | null>(null)
+  const [editAddressError, setEditAddressError] = useState<string | null>(null)
 
   // Source IDs currently assigned to an active or activating production
   const activeSourceIds = new Set(
@@ -64,30 +66,48 @@ export function SourcesPanel() {
       .flatMap((p) => p.sources.map((s) => s.sourceId)),
   )
 
+  function validateAddress(address: string, streamType: StreamType): string | null {
+    if (!STREAM_TYPE_HAS_ADDRESS[streamType]) return null
+    if (!address.trim()) return 'Address is required'
+    if (streamType === 'html') {
+      try { const u = new URL(address); if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error() }
+      catch { return 'Must be a valid http:// or https:// URL' }
+    } else {
+      if (!/^srt:\/\/[^?#]*:\d+/.test(address.trim())) return 'Must be a valid srt:// URI'
+    }
+    return null
+  }
+
   function handleAdd() {
     if (!newName.trim()) return
+    const addrErr = validateAddress(newAddress, newStreamType)
+    if (addrErr) { setAddAddressError(addrErr); return }
     addSource({
       name: newName.trim(),
       address: newAddress.trim(),
       streamType: newStreamType,
       status: 'inactive',
       color: '#27272a',
-      ...(STREAM_TYPE_HAS_LATENCY[newStreamType] ? { latency: newLatency } : {}),
+      ...(STREAM_TYPE_HAS_LATENCY[newStreamType] ? { latency: parseInt(newLatency, 10) || 125 } : {}),
     })
     setNewName('')
     setNewAddress('')
     setNewStreamType('srt')
-    setNewLatency(125)
+    setNewLatency('')
+    setAddAddressError(null)
     setAddOpen(false)
   }
 
   function handleEdit() {
     if (!editTarget || !editTarget.name.trim()) return
+    const addrErr = validateAddress(editTarget.address, editTarget.streamType)
+    if (addrErr) { setEditAddressError(addrErr); return }
     void updateSource(editTarget.id, {
       name: editTarget.name.trim(),
       address: editTarget.address.trim(),
-      latency: editTarget.latency,
+      latency: parseInt(editTarget.latency, 10) || 125,
     })
+    setEditAddressError(null)
     setEditTarget(null)
   }
 
@@ -102,7 +122,7 @@ export function SourcesPanel() {
           </span>
           {isLoading && <span className="text-xs text-[--color-accent]">Refreshing…</span>}
         </div>
-        <Button size="sm" variant="active" onClick={() => setAddOpen(true)}>+ Add Source</Button>
+        <Button size="sm" variant="active" onClick={() => setAddOpen(true)}>+ New Source</Button>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -116,7 +136,7 @@ export function SourcesPanel() {
                   ? 'border-[--color-border] hover:border-zinc-600 cursor-not-allowed'
                   : 'border-[--color-border] hover:border-orange-500 cursor-pointer'
               }`}
-              onClick={() => !inActiveProduction && setEditTarget({ id: src.id, name: src.name, address: src.address ?? '', latency: src.latency ?? 125 })}
+              onClick={() => !inActiveProduction && setEditTarget({ id: src.id, name: src.name, address: src.address ?? '', latency: src.latency != null ? String(src.latency) : '', streamType: src.streamType })}
             >
               <StatusDot color={inActiveProduction ? 'red' : 'gray'} />
               <div className="flex-1 min-w-0">
@@ -138,7 +158,7 @@ export function SourcesPanel() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={(e) => { e.stopPropagation(); !inActiveProduction && setEditTarget({ id: src.id, name: src.name, address: src.address ?? '', latency: src.latency ?? 125 }) }}
+                onClick={(e) => { e.stopPropagation(); !inActiveProduction && setEditTarget({ id: src.id, name: src.name, address: src.address ?? '', latency: src.latency != null ? String(src.latency) : '', streamType: src.streamType }) }}
                 disabled={inActiveProduction}
                 className="text-white hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed"
                 title={inActiveProduction ? 'Cannot edit source in an active production' : 'Edit source'}
@@ -185,7 +205,7 @@ export function SourcesPanel() {
 
       {/* Edit modal */}
       {editTarget && (
-        <Modal open title="Edit Source" onClose={() => setEditTarget(null)}>
+        <Modal open title="Edit Source" onClose={() => { setEditTarget(null); setEditAddressError(null) }}>
           <div className="flex flex-col gap-3">
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Name</label>
@@ -196,34 +216,40 @@ export function SourcesPanel() {
                 className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
               />
             </div>
-            <div>
-              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Address</label>
-              <input
-                type="text"
-                value={editTarget.address}
-                onChange={(e) => setEditTarget({ ...editTarget, address: e.target.value })}
-                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Latency (ms)</label>
-              <input
-                type="number"
-                min={0}
-                value={editTarget.latency}
-                onChange={(e) => setEditTarget({ ...editTarget, latency: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
-              />
-            </div>
+            {STREAM_TYPE_HAS_ADDRESS[editTarget.streamType] && (
+              <div>
+                <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Address</label>
+                <input
+                  type="text"
+                  value={editTarget.address}
+                  onChange={(e) => { setEditTarget({ ...editTarget, address: e.target.value }); setEditAddressError(null) }}
+                  className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
+                />
+                {editAddressError && <p className="text-xs text-red-400 mt-1">{editAddressError}</p>}
+              </div>
+            )}
+            {STREAM_TYPE_HAS_LATENCY[editTarget.streamType] && (
+              <div>
+                <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Latency (ms)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editTarget.latency}
+                  placeholder="125"
+                  onChange={(e) => setEditTarget({ ...editTarget, latency: e.target.value })}
+                  className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
+                />
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={() => setEditTarget(null)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => { setEditTarget(null); setEditAddressError(null) }}>Cancel</Button>
               <Button variant="active" onClick={handleEdit} disabled={!editTarget.name.trim()}>Save</Button>
             </div>
           </div>
         </Modal>
       )}
 
-      <Modal open={addOpen} title="Add Source" onClose={() => setAddOpen(false)}>
+      <Modal open={addOpen} title="New Source" onClose={() => setAddOpen(false)}>
         <div className="flex flex-col gap-3">
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Name</label>
@@ -260,10 +286,11 @@ export function SourcesPanel() {
               <input
                 type="text"
                 value={newAddress}
-                onChange={(e) => setNewAddress(e.target.value)}
+                onChange={(e) => { setNewAddress(e.target.value); setAddAddressError(null) }}
                 placeholder={STREAM_TYPE_ADDRESS_PLACEHOLDER[newStreamType] ?? 'srt://192.168.1.10:9000?mode=caller'}
                 className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
               />
+              {addAddressError && <p className="text-xs text-red-400 mt-1">{addAddressError}</p>}
             </div>
           )}
           {STREAM_TYPE_HAS_LATENCY[newStreamType] && (
@@ -276,14 +303,15 @@ export function SourcesPanel() {
                 min={20}
                 max={8000}
                 value={newLatency}
-                onChange={(e) => setNewLatency(e.target.valueAsNumber)}
+                placeholder="125"
+                onChange={(e) => setNewLatency(e.target.value)}
                 className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
               />
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button variant="active" onClick={handleAdd} disabled={!newName.trim()}>Add Source</Button>
+            <Button variant="active" onClick={handleAdd} disabled={!newName.trim()}>Save</Button>
           </div>
         </div>
       </Modal>

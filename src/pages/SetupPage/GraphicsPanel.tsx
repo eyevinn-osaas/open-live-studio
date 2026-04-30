@@ -12,6 +12,11 @@ function timeSince(ts: number): string {
   return `${Math.floor(secs / 60)}m ago`
 }
 
+function isValidHttpUrl(s: string): boolean {
+  try { const u = new URL(s); return u.protocol === 'http:' || u.protocol === 'https:' }
+  catch { return false }
+}
+
 export function GraphicsPanel() {
   const { graphics, isLoading, lastFetchedAt, addGraphic, updateGraphic, removeGraphic } = useGraphicsStore()
   const productions = useProductionsStore((s) => s.productions)
@@ -29,18 +34,24 @@ export function GraphicsPanel() {
 
   const [newName, setNewName] = useState('')
   const [newUrl, setNewUrl] = useState('')
+  const [addUrlError, setAddUrlError] = useState<string | null>(null)
+  const [editUrlError, setEditUrlError] = useState<string | null>(null)
 
   function handleAdd() {
     if (!newName.trim() || !newUrl.trim()) return
+    if (!isValidHttpUrl(newUrl.trim())) { setAddUrlError('Must be a valid http:// or https:// URL'); return }
     void addGraphic({ name: newName.trim(), url: newUrl.trim() })
     setNewName('')
     setNewUrl('')
+    setAddUrlError(null)
     setAddOpen(false)
   }
 
   function handleEdit() {
     if (!editTarget || !editTarget.name.trim() || !editTarget.url.trim()) return
+    if (!isValidHttpUrl(editTarget.url.trim())) { setEditUrlError('Must be a valid http:// or https:// URL'); return }
     void updateGraphic(editTarget.id, { name: editTarget.name.trim(), url: editTarget.url.trim() })
+    setEditUrlError(null)
     setEditTarget(null)
   }
 
@@ -55,7 +66,7 @@ export function GraphicsPanel() {
           </span>
           {isLoading && <span className="text-xs text-[--color-accent]">Refreshing…</span>}
         </div>
-        <Button size="sm" variant="active" onClick={() => setAddOpen(true)}>+ Add Graphic</Button>
+        <Button size="sm" variant="active" onClick={() => setAddOpen(true)}>+ New Graphic</Button>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -135,7 +146,7 @@ export function GraphicsPanel() {
       )}
 
       {/* Add modal */}
-      <Modal open={addOpen} title="Add Graphic" onClose={() => setAddOpen(false)}>
+      <Modal open={addOpen} title="New Graphic" onClose={() => { setAddOpen(false); setAddUrlError(null) }}>
         <div className="flex flex-col gap-3">
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Name</label>
@@ -150,12 +161,13 @@ export function GraphicsPanel() {
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">URL</label>
             <input
-              type="url"
+              type="text"
               value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
+              onChange={(e) => { setNewUrl(e.target.value); setAddUrlError(null) }}
               placeholder="https://example.com/overlay"
               className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
             />
+            {addUrlError && <p className="text-xs text-red-400 mt-1">{addUrlError}</p>}
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
@@ -164,7 +176,7 @@ export function GraphicsPanel() {
               onClick={handleAdd}
               disabled={!newName.trim() || !newUrl.trim()}
             >
-              Add Graphic
+              Save
             </Button>
           </div>
         </div>
@@ -172,7 +184,7 @@ export function GraphicsPanel() {
 
       {/* Edit modal */}
       {editTarget && (
-        <Modal open title="Edit Graphic" onClose={() => setEditTarget(null)}>
+        <Modal open title="Edit Graphic" onClose={() => { setEditTarget(null); setEditUrlError(null) }}>
           <div className="flex flex-col gap-3">
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Name</label>
@@ -186,14 +198,15 @@ export function GraphicsPanel() {
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">URL</label>
               <input
-                type="url"
+                type="text"
                 value={editTarget.url}
-                onChange={(e) => setEditTarget({ ...editTarget, url: e.target.value })}
+                onChange={(e) => { setEditTarget({ ...editTarget, url: e.target.value }); setEditUrlError(null) }}
                 className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
               />
+              {editUrlError && <p className="text-xs text-red-400 mt-1">{editUrlError}</p>}
             </div>
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={() => setEditTarget(null)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => { setEditTarget(null); setEditUrlError(null) }}>Cancel</Button>
               <Button
                 variant="active"
                 onClick={handleEdit}

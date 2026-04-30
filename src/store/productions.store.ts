@@ -23,6 +23,7 @@ export interface Production {
   srtOutputUri?: string
   values?: Record<string, string | number>
   airTime?: string
+  deletionWarnings?: Array<{ type: 'source' | 'graphic' | 'output'; name: string }>
 }
 
 interface ProductionsState {
@@ -36,6 +37,7 @@ interface ProductionsActions {
   addProduction: (name: string) => Promise<void>
   removeProduction: (id: string) => Promise<void>
   updateStatus: (id: string, status: ProductionStatus) => Promise<void>
+  updateName: (id: string, name: string) => Promise<void>
   updateTemplateId: (id: string, templateId: string | null) => Promise<void>
   updateValues: (id: string, values: Record<string, string | number>) => Promise<void>
   updateAirTime: (id: string, airTime: string | null) => Promise<void>
@@ -63,6 +65,7 @@ function fromApi(p: ApiProduction): Production {
     srtOutputUri: p.srtOutputUri,
     values: p.values,
     airTime: p.airTime,
+    deletionWarnings: p.deletionWarnings,
   }
 }
 
@@ -145,6 +148,14 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
           }
           await poll()
         }
+      },
+
+      updateName: async (id, name) => {
+        await productionsApi.update(id, { name })
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (prod) prod.name = name
+        })
       },
 
       updateTemplateId: async (id, templateId) => {

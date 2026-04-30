@@ -12,6 +12,7 @@ import type { ApiTemplate, TemplateProperty, ProductionConfig, ProductionGraphic
 import { Button } from '@/components/ui/Button'
 import { StatusDot } from '@/components/ui/StatusDot'
 import { Modal } from '@/components/ui/Modal'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 // ---------------------------------------------------------------------------
 // Shared select style
@@ -105,6 +106,10 @@ function GfxSlotRow({ dskInput: _dskInput, currentGraphicId, onChange }: GfxSlot
 
 const VIRTUAL_OUTPUT_ID = '__whep__'
 
+function toCallerUrl(url: string): string {
+  return url.replace(/mode=listener/i, 'mode=caller')
+}
+
 const OUTPUT_TYPE_LABELS: Record<string, string> = {
   mpegtssrt: 'MPEG-TS/SRT',
   efpsrt: 'EFP/SRT',
@@ -122,22 +127,18 @@ interface OutputSlotRowProps {
 
 function OutputSlotRow({ value, usedIds, takenByOtherIds, canRemove, onChange, onRemove }: OutputSlotRowProps) {
   const outputs = useOutputsStore((s) => s.outputs)
-  const whepUsed = usedIds.includes(VIRTUAL_OUTPUT_ID) && value !== VIRTUAL_OUTPUT_ID
-  const whepTaken = takenByOtherIds.includes(VIRTUAL_OUTPUT_ID)
   return (
     <div className="flex items-center gap-2">
       <select value={value} onChange={(e) => onChange(e.target.value)} className={`${selectCls} flex-1`}>
         <option value="">— none —</option>
         {outputs
-          .filter((o) => o.id === value || (!usedIds.includes(o.id) && !takenByOtherIds.includes(o.id)))
+          .filter((o) => o.id === value || o.outputType === 'whep' || !usedIds.includes(o.id))
           .map((o) => (
             <option key={o.id} value={o.id}>{o.name} ({OUTPUT_TYPE_LABELS[o.outputType] ?? o.outputType})</option>
           ))}
-        {!whepUsed && !whepTaken && (
-          <optgroup label="WebRTC">
-            <option value={VIRTUAL_OUTPUT_ID}>WHEP Output</option>
-          </optgroup>
-        )}
+        <optgroup label="WebRTC">
+          <option value={VIRTUAL_OUTPUT_ID}>WHEP Output</option>
+        </optgroup>
       </select>
       <button
         type="button"
@@ -163,7 +164,7 @@ interface OptionsModalProps {
 }
 
 function ProductionOptionsModal({ production, template, onClose }: OptionsModalProps) {
-  const { assignSource, unassignSource, assignGraphic, unassignGraphic, updateValues, assignOutput, unassignOutput } = useProductionsStore()
+  const { assignSource, unassignSource, assignGraphic, unassignGraphic, updateValues, updateName, assignOutput, unassignOutput } = useProductionsStore()
   const allProductions = useProductionsStore((s) => s.productions)
   const sources = useSourcesStore((s) => s.sources)
   const graphics = useGraphicsStore((s) => s.graphics)
@@ -217,6 +218,14 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
     if (id) await unassignOutput(production.id, id)
   }
 
+  const [prodName, setProdName] = useState(production.name)
+
+  async function handleNameBlur() {
+    const trimmed = prodName.trim()
+    if (trimmed && trimmed !== production.name) await updateName(production.id, trimmed)
+    else setProdName(production.name)
+  }
+
   const [assignments, setAssignments] = useState<Record<string, string>>(() =>
     Object.fromEntries(production.sources.map((s) => [s.mixerInput, s.sourceId]))
   )
@@ -239,12 +248,30 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
 
   async function handleRemove(index: number) {
     if (slotCount <= MIN_INPUTS) return
-    const pad = mixerInput(index)
-    if (assignments[pad]) {
-      await unassignSource(production.id, pad)
-      setAssignments((prev) => { const n = { ...prev }; delete n[pad]; return n })
+
+    // Shift all assignments after the removed index down by 1, clear the last slot
+    const newAssignments = { ...assignments }
+    for (let i = index; i < slotCount - 1; i++) {
+      const next = mixerInput(i + 1)
+      const curr = mixerInput(i)
+      if (newAssignments[next]) { newAssignments[curr] = newAssignments[next] }
+      else { delete newAssignments[curr] }
     }
+    delete newAssignments[mixerInput(slotCount - 1)]
+
+    setAssignments(newAssignments)
     setSlotCount((c) => c - 1)
+
+    // Sync backend for every slot that changed
+    const ops: Promise<unknown>[] = []
+    for (let i = index; i < slotCount; i++) {
+      const pad = mixerInput(i)
+      const newSrc = newAssignments[pad]
+      const oldSrc = assignments[pad]
+      if (newSrc && newSrc !== oldSrc) ops.push(assignSource(production.id, { mixerInput: pad, sourceId: newSrc }))
+      else if (!newSrc && oldSrc) ops.push(unassignSource(production.id, pad))
+    }
+    await Promise.all(ops)
   }
 
   async function handleGfxChange(dskInput: string, graphicId: string) {
@@ -267,27 +294,24 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
     setValuesDirty(true)
   }
 
-  async function handleSaveValues() {
-    await updateValues(production.id, configValues)
-    setValuesDirty(false)
-  }
-
   const assigned = Object.values(assignments).filter(Boolean).length
 
   return (
-    <Modal open title={`${production.name} — Options`} onClose={onClose} className="max-w-3xl">
+    <Modal open title="Production Options" onClose={onClose} className="max-w-3xl">
       <div className="flex flex-col gap-5">
         <div className="grid grid-cols-2 gap-x-8">
 
-          {/* LEFT — template + config */}
+          {/* LEFT — name + config */}
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-1">
-              <span className="text-xs uppercase tracking-wider text-orange-500">Template</span>
-              {template ? (
-                <span className="text-sm text-[--color-text-primary] font-medium">{template.name}</span>
-              ) : (
-                <span className="text-sm text-[--color-text-muted] italic">No template assigned</span>
-              )}
+              <span className="text-xs uppercase tracking-wider text-orange-500">Name</span>
+              <input
+                className={inputCls}
+                value={prodName}
+                onChange={(e) => setProdName(e.target.value)}
+                onBlur={() => void handleNameBlur()}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+              />
             </div>
 
             {template && (template.properties?.length ?? 0) > 0 && (
@@ -318,11 +342,6 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
                         />
                       </div>
                     ))}
-                    {valuesDirty && (
-                      <div className="flex justify-end">
-                        <Button size="sm" variant="active" onClick={() => void handleSaveValues()}>Save</Button>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -370,7 +389,7 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
                       onClick={() => setSlotCount((c) => c + 1)}
                       className="text-xs text-[--color-accent] hover:opacity-80 text-left transition-opacity"
                     >
-                      + Add Input
+                      + New Input
                     </button>
                   )}
                 </>
@@ -417,12 +436,10 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
                   {outputList.length === 0
                     ? <span className="text-xs text-[--color-text-muted] italic">No outputs assigned</span>
                     : outputList.map((outputId) => {
-                        const whepUrl = production.whepOutputUrls?.find((w) => w.outputId === outputId)?.url
                         const label = outputId === VIRTUAL_OUTPUT_ID ? 'WHEP Output' : (catalogueOutputs.find((o) => o.id === outputId)?.name ?? outputId)
                         return (
                           <div key={outputId} className="flex items-center gap-2">
                             <span className="text-xs text-[--color-text-primary]">{label}</span>
-                            {whepUrl && <InlineCopyButton label="WHEP" value={whepUrl} />}
                           </div>
                         )
                       })
@@ -435,7 +452,7 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
                       key={i}
                       value={id}
                       usedIds={outputList}
-                      takenByOtherIds={outputsTakenByOthers}
+                      takenByOtherIds={[]}
                       canRemove={true}
                       onChange={(newId) => void handleOutputChange(i, newId)}
                       onRemove={() => void handleOutputRemove(i)}
@@ -446,7 +463,7 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
                     onClick={() => setOutputList((prev) => [...prev, ''])}
                     className="text-xs text-[--color-accent] hover:opacity-80 text-left transition-opacity"
                   >
-                    + Add Output
+                    + New Output
                   </button>
                 </div>
               )}
@@ -478,7 +495,7 @@ function ProductionOptionsModal({ production, template, onClose }: OptionsModalP
           {isActive && (
             <span className="text-xs text-[--color-text-muted] italic">Deactivate this production to make changes.</span>
           )}
-          <Button variant="active" onClick={onClose} className="ml-auto">Done</Button>
+          <Button variant="active" onClick={() => { if (valuesDirty) void updateValues(production.id, configValues); onClose() }} className="ml-auto">Done</Button>
         </div>
       </div>
     </Modal>
@@ -669,40 +686,20 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
               />
             </div>
 
-            <div>
-              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">
-                Flow Template <span className="normal-case text-[--color-text-muted]">(optional)</span>
-              </label>
-              {templates.length === 0 ? (
-                <p className="text-xs text-[--color-text-muted] py-2">
-                  No templates found. Create one via the API to enable Strom flow activation.
-                </p>
-              ) : (
-                <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className={selectCls}>
-                  <option value="">— none —</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-
             {selectedTemplate && hasProperties && (
               <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <span className="text-xs uppercase tracking-wider text-orange-500 shrink-0">Configuration</span>
-                  {savedConfigs.length > 0 && (
-                    <select
-                      value={selectedConfigId}
-                      onChange={(e) => handleConfigSelect(e.target.value)}
-                      className="flex-1 px-2 py-1 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-xs text-[--color-text-primary] focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
-                    >
-                      <option value="">— load saved config —</option>
-                      {savedConfigs.map((c) => (
-                        <option key={c._id} value={c._id}>{c.name}</option>
-                      ))}
-                    </select>
-                  )}
+                  <select
+                    value={selectedConfigId}
+                    onChange={(e) => handleConfigSelect(e.target.value)}
+                    className="flex-1 px-2 py-1 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-xs text-[--color-text-primary] focus:outline-none focus:border-orange-500 appearance-none cursor-pointer"
+                  >
+                    <option value="">— load saved config —</option>
+                    {savedConfigs.map((c) => (
+                      <option key={c._id} value={c._id}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {(selectedTemplate.properties ?? []).map((prop) => (
@@ -716,34 +713,24 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
                   </div>
                 ))}
 
-                <div className="flex flex-col gap-2 items-end">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={saveAsConfig}
-                      onChange={(e) => setSaveAsConfig(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span className="text-xs text-[--color-text-muted]">Save as config</span>
-                    <div className="relative group/tip">
-                      <span className="w-4 h-4 rounded-full bg-[--color-surface-raised] border border-[--color-border-strong] text-[--color-text-muted] text-[10px] flex items-center justify-center cursor-default select-none">
-                        ?
-                      </span>
-                      <div className="absolute bottom-full right-0 mb-2 w-48 px-2.5 py-2 rounded bg-zinc-800 text-white text-xs leading-relaxed opacity-0 group-hover/tip:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
-                        Saves these settings as a named config you can reload in future productions.
-                      </div>
-                    </div>
-                  </label>
-                  {saveAsConfig && (
-                    <input
-                      type="text"
-                      value={configName}
-                      onChange={(e) => setConfigName(e.target.value)}
-                      placeholder="Config name, e.g. HD Standard"
-                      className={inputCls}
-                    />
-                  )}
-                </div>
+                <label className="flex items-center justify-end gap-2 cursor-pointer select-none">
+                  <span className="text-xs text-[--color-text-muted]">Save as config</span>
+                  <input
+                    type="checkbox"
+                    checked={saveAsConfig}
+                    onChange={(e) => setSaveAsConfig(e.target.checked)}
+                    className="accent-orange-500"
+                  />
+                </label>
+                {saveAsConfig && (
+                  <input
+                    type="text"
+                    value={configName}
+                    onChange={(e) => setConfigName(e.target.value)}
+                    placeholder="Config name, e.g. HD Standard"
+                    className={inputCls}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -773,7 +760,16 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
                             setAssignments((prev) => ({ ...prev, [mixerInput(i)]: sourceId }))
                           }
                           onRemove={() => {
-                            setAssignments((prev) => { const n = { ...prev }; delete n[mixerInput(i)]; return n })
+                            setAssignments((prev) => {
+                              const n = { ...prev }
+                              for (let j = i; j < slotCount - 1; j++) {
+                                const next = mixerInput(j + 1)
+                                const curr = mixerInput(j)
+                                if (n[next]) { n[curr] = n[next] } else { delete n[curr] }
+                              }
+                              delete n[mixerInput(slotCount - 1)]
+                              return n
+                            })
                             setSlotCount((c) => c - 1)
                           }}
                         />
@@ -785,7 +781,7 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
                         onClick={() => setSlotCount((c) => c + 1)}
                         className="text-xs text-[--color-accent] hover:opacity-80 text-left transition-opacity"
                       >
-                        + Add Input
+                        + New Input
                       </button>
                     )}
                   </>
@@ -819,7 +815,7 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
                     key={i}
                     value={id}
                     usedIds={outputList}
-                    takenByOtherIds={outputsTakenByAll}
+                    takenByOtherIds={[]}
                     canRemove={true}
                     onChange={(newId) => setOutputList((prev) => prev.map((v, j) => j === i ? newId : v))}
                     onRemove={() => setOutputList((prev) => prev.filter((_, j) => j !== i))}
@@ -830,7 +826,7 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
                   onClick={() => setOutputList((prev) => [...prev, ''])}
                   className="text-xs text-[--color-accent] hover:opacity-80 text-left transition-opacity"
                 >
-                  + Add Output
+                  + New Output
                 </button>
               </div>
             </div>
@@ -872,6 +868,7 @@ export function ProductionsPanel() {
   const { productions, isLoading, removeProduction, updateStatus, fetchAll } = useProductionsStore()
   const { activeProductionId, setActiveProduction } = useProductionStore()
   const { fetchAll: fetchTemplates, templates } = useTemplatesStore()
+  const outputs = useOutputsStore((s) => s.outputs)
   const navigate = useNavigate()
 
   // Ticks every second so on-air pills update in real time
@@ -885,6 +882,7 @@ export function ProductionsPanel() {
   const [optionsId, setOptionsId] = useState<string | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [deactivateTargetId, setDeactivateTargetId] = useState<string | null>(null)
+  const [activationError, setActivationError] = useState<{ prodId: string; message: string } | null>(null)
 
   // Fetch templates when panel mounts
   useEffect(() => {
@@ -956,28 +954,78 @@ export function ProductionsPanel() {
                       On Air
                     </span>
                   )}
+                  {prod.deletionWarnings && prod.deletionWarnings.length > 0 && (() => {
+                    const byType = prod.deletionWarnings!.reduce<Record<string, string[]>>((acc, w) => {
+                      ;(acc[w.type] ??= []).push(w.name)
+                      return acc
+                    }, {})
+                    return (
+                      <Tooltip
+                        className="shrink-0 text-yellow-400 cursor-default"
+                        content={
+                          <div className="bg-zinc-800 border border-zinc-600 rounded px-3 py-2 text-xs text-left shadow-lg w-56">
+                            <p className="font-semibold text-white mb-1.5">The following have been deleted:</p>
+                            {byType['source'] && byType['source'].map((n, i) => (
+                              <p key={i} className="text-zinc-200">
+                                {i === 0 && <span className="text-zinc-400 uppercase tracking-wider text-[10px]">Sources: </span>}
+                                {i > 0 && <span className="text-zinc-400 uppercase tracking-wider text-[10px] invisible">Sources: </span>}
+                                {n}
+                              </p>
+                            ))}
+                            {byType['output'] && byType['output'].map((n, i) => (
+                              <p key={i} className="text-zinc-200">
+                                {i === 0 && <span className="text-zinc-400 uppercase tracking-wider text-[10px]">Outputs: </span>}
+                                {i > 0 && <span className="text-zinc-400 uppercase tracking-wider text-[10px] invisible">Outputs: </span>}
+                                {n}
+                              </p>
+                            ))}
+                            {byType['graphic'] && byType['graphic'].map((n, i) => (
+                              <p key={i} className="text-zinc-200">
+                                {i === 0 && <span className="text-zinc-400 uppercase tracking-wider text-[10px]">Graphics: </span>}
+                                {i > 0 && <span className="text-zinc-400 uppercase tracking-wider text-[10px] invisible">Graphics: </span>}
+                                {n}
+                              </p>
+                            ))}
+                          </div>
+                        }
+                      >
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4" aria-label="Deletion warning">
+                          <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                        </svg>
+                      </Tooltip>
+                    )
+                  })()}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 min-w-0">
                   <span className="text-xs text-[--color-text-muted] truncate">
                     {template ? template.name : 'No template'}{assignedCount > 0 ? ` · ${assignedCount} ${assignedCount === 1 ? 'source' : 'sources'}` : ''}
                   </span>
-                  {isActive && prod.srtOutputUri && (
-                    <InlineCopyButton label="SRT Out" value={prod.srtOutputUri} />
-                  )}
                   {isActive && prod.whipEndpoints?.map((ep) => {
                     const idx = /(\d+)$/.exec(ep.mixerInput)?.[1]
                     return (
                       <InlineCopyButton
                         key={ep.mixerInput}
-                        label={`WHIP In ${idx !== undefined ? parseInt(idx, 10) + 1 : ep.mixerInput}`}
+                        label={`WHIP IN: Input ${idx !== undefined ? parseInt(idx, 10) + 1 : ep.mixerInput}`}
                         value={ep.url}
                       />
                     )
                   })}
-                  {isActive && prod.whepOutputUrls?.map((w) => (
-                    <InlineCopyButton key={w.outputId} label="PGM WHEP" value={w.url} />
-                  ))}
+                  {isActive && prod.srtOutputUri && (
+                    <InlineCopyButton label="SRT OUT: Program" value={toCallerUrl(prod.srtOutputUri)} displayUrl={prod.srtOutputUri} />
+                  )}
+                  {isActive && prod.outputAssignments?.flatMap((a) => {
+                    const out = outputs.find((o) => o.id === a.outputId)
+                    if (!out || out.outputType === 'whep' || !out.url) return []
+                    return [<InlineCopyButton key={a.outputId} label={`SRT OUT: ${out.name}`} value={toCallerUrl(out.url)} displayUrl={out.url} />]
+                  })}
+                  {isActive && prod.whepOutputUrls?.map((w) => {
+                    const out = outputs.find((o) => o.id === w.outputId)
+                    return <InlineCopyButton key={w.outputId} label={`WHEP OUT: ${out?.name ?? 'Output'}`} value={w.url} />
+                  })}
                 </div>
+                {activationError?.prodId === prod.id && (
+                  <p className="text-xs text-red-400 mt-0.5">{activationError.message}</p>
+                )}
               </div>
               <div className="flex gap-2 shrink-0">
                 {isActive && (
@@ -1015,8 +1063,10 @@ export function ProductionsPanel() {
                     onClick={(e) => {
                       e.stopPropagation()
                       if (!isActivating) {
-                        void updateStatus(prod.id, 'active')
-                        setActiveProduction(prod.id)
+                        setActivationError(null)
+                        updateStatus(prod.id, 'active')
+                          .then(() => setActiveProduction(prod.id))
+                          .catch((err: unknown) => setActivationError({ prodId: prod.id, message: err instanceof Error ? err.message : 'Activation failed' }))
                       }
                     }}
                     className="text-orange-500 hover:text-orange-400 border-transparent"
@@ -1121,7 +1171,7 @@ const VIRTUAL_SOURCE_NAMES: Record<string, string> = {
   '__test2__': 'Colors',
 }
 
-function InlineCopyButton({ label, value }: { label: string; value: string }) {
+function InlineCopyButton({ label, value, displayUrl }: { label: string; value: string; displayUrl?: string }) {
   const [copied, setCopied] = useState(false)
   function handleCopy(e: React.MouseEvent) {
     e.stopPropagation()
@@ -1134,7 +1184,7 @@ function InlineCopyButton({ label, value }: { label: string; value: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      title={value}
+      title={displayUrl ?? value}
       className="relative -top-0.5 inline-flex items-center gap-1 shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] border border-[--color-border] text-[--color-text-muted] hover:text-orange-500 hover:border-[--color-accent]/40 transition-colors cursor-pointer"
     >
       {copied ? (
