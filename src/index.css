@@ -258,6 +258,14 @@ body.fader-dragging * {
   box-shadow: none !important;
 }
 
+/* Native select options — force dark theme on Windows where the OS renders the dropdown list.
+   Use solid hex colors — alpha rgba values fail on Windows native dropdown controls. */
+select option,
+select optgroup {
+  background-color: #222222;
+  color: #ebebeb;
+}
+
 /* Production select styling */
 select.broadcast-select {
   background-color: #111111;

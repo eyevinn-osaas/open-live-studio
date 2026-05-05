@@ -71,7 +71,7 @@ export function SourceBusDual() {
       <div className="flex flex-col gap-1">
         <span className="text-[9px] font-bold uppercase tracking-widest text-[--color-pvw]">Preview</span>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {sources.map((src) => (
+          {[...sources].sort((a, b) => a.name.localeCompare(b.name)).map((src) => (
             <SourceCell
               key={src.id}
               sourceId={src.id}
@@ -85,7 +85,7 @@ export function SourceBusDual() {
       <div className="flex flex-col gap-1">
         <span className="text-[9px] font-bold uppercase tracking-widest text-[--color-pgm]">Program</span>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {sources.map((src) => (
+          {[...sources].sort((a, b) => a.name.localeCompare(b.name)).map((src) => (
             <SourceCell
               key={src.id}
               sourceId={src.id}

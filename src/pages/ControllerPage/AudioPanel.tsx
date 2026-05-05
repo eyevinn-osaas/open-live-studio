@@ -418,10 +418,10 @@ function ChannelStrip({ elementId, label, send, showAfv = false, mixerInput = nu
           className={cn(
             'btn-hardware flex-1 py-0.5 text-[9px] font-bold uppercase tracking-widest border transition-colors',
             mode === 'on'
-              ? 'border-green-700 text-green-300'
+              ? 'border-red-800 text-red-300'
               : 'bg-zinc-900 text-zinc-500 border-zinc-700 hover:text-zinc-300',
           )}
-          style={mode === 'on' ? { background: 'rgba(0,170,60,0.2)' } : {}}
+          style={mode === 'on' ? { background: 'rgba(180,0,0,0.25)' } : {}}
         >
           ON
         </button>

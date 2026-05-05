@@ -171,7 +171,6 @@ function EditConfigModal({ config, onSave, onClose }: { config: ProductionConfig
 // ---------------------------------------------------------------------------
 
 export function ConfigsPanel() {
-  const { fetchAll: fetchTemplates } = useTemplatesStore()
   const [configs, setConfigs] = useState<ProductionConfig[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -179,9 +178,8 @@ export function ConfigsPanel() {
   const [deleteTarget, setDeleteTarget] = useState<ProductionConfig | null>(null)
 
   useEffect(() => {
-    void fetchTemplates()
     void load()
-  }, [fetchTemplates])
+  }, [])
 
   async function load() {
     setIsLoading(true)

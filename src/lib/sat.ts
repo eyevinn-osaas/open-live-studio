@@ -20,6 +20,9 @@ interface SatCache {
 }
 
 let cache: SatCache | null = null
+// In-flight promise so concurrent callers await the same exchange request
+// instead of each firing their own, which would produce N requests on page load.
+let inflight: Promise<string> | null = null
 
 function isExpiringSoon(c: SatCache): boolean {
   return Date.now() >= c.expiresAt - REFRESH_BUFFER_MS
@@ -44,22 +47,27 @@ export async function getApiToken(): Promise<string | undefined> {
 
   if (cache && !isExpiringSoon(cache)) return cache.token
 
-  const res = await fetch(TOKEN_EXCHANGE_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      accept: 'application/json',
-      'x-pat-jwt': `Bearer ${pat}`,
-    },
-    body: JSON.stringify({ serviceId: OPEN_LIVE_SERVICE_ID }),
-  })
-
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`SAT exchange failed (${res.status}): ${body.slice(0, 200)}`)
+  if (!inflight) {
+    inflight = fetch(TOKEN_EXCHANGE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+        'x-pat-jwt': `Bearer ${pat}`,
+      },
+      body: JSON.stringify({ serviceId: OPEN_LIVE_SERVICE_ID }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.text()
+          throw new Error(`SAT exchange failed (${res.status}): ${body.slice(0, 200)}`)
+        }
+        const data = (await res.json()) as { token: string; expiry: number }
+        cache = { token: data.token, expiresAt: data.expiry * 1000 }
+        return cache.token
+      })
+      .finally(() => { inflight = null })
   }
 
-  const data = (await res.json()) as { token: string; expiry: number }
-  cache = { token: data.token, expiresAt: data.expiry * 1000 }
-  return cache.token
+  return inflight
 }

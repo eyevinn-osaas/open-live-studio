@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useOutputsStore, type OutputType } from '@/store/outputs.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { Button } from '@/components/ui/Button'
@@ -23,8 +23,14 @@ function timeSince(ts: number): string {
 const inputCls = 'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30'
 
 export function OutputsPanel() {
-  const { outputs, isLoading, lastFetchedAt, addOutput, updateOutput, removeOutput } = useOutputsStore()
+  const { outputs, isLoading, lastFetchedAt, addOutput, updateOutput, removeOutput, fetchAll } = useOutputsStore()
   const productions = useProductionsStore((s) => s.productions)
+
+  useEffect(() => {
+    void fetchAll()
+    const id = setInterval(() => void fetchAll(), 15000)
+    return () => clearInterval(id)
+  }, [fetchAll])
 
   const activeOutputIds = new Set(
     productions

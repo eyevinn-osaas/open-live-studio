@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSourcesStore } from '@/store/sources.store'
 import { useProductionsStore } from '@/store/productions.store'
 import type { StreamType } from '@/lib/api'
@@ -47,8 +47,14 @@ const STREAM_TYPE_ADDRESS_PLACEHOLDER: Partial<Record<StreamType, string>> = {
 const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'html']
 
 export function SourcesPanel() {
-  const { sources, isLoading, lastFetchedAt, removeSource, addSource, updateSource } = useSourcesStore()
+  const { sources, isLoading, lastFetchedAt, removeSource, addSource, updateSource, fetchAll } = useSourcesStore()
   const productions = useProductionsStore((s) => s.productions)
+
+  useEffect(() => {
+    void fetchAll()
+    const id = setInterval(() => void fetchAll(), 15000)
+    return () => clearInterval(id)
+  }, [fetchAll])
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [editTarget, setEditTarget] = useState<{ id: string; name: string; address: string; latency: string; streamType: StreamType } | null>(null)
@@ -126,7 +132,7 @@ export function SourcesPanel() {
       </div>
 
       <div className="flex flex-col gap-1">
-        {sources.map((src) => {
+        {[...sources].sort((a, b) => a.name.localeCompare(b.name)).map((src) => {
           const inActiveProduction = activeSourceIds.has(src.id)
           return (
             <div

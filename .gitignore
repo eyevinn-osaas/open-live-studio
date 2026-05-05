@@ -3,4 +3,5 @@ dist/
 .DS_Store
 *.local
 .env
+.env.production
 package-lock.json
