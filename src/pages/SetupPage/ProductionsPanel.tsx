@@ -15,6 +15,19 @@ import { Modal } from '@/components/ui/Modal'
 import { Tooltip } from '@/components/ui/Tooltip'
 
 // ---------------------------------------------------------------------------
+// Stream type labels — used for grouping source dropdowns
+// ---------------------------------------------------------------------------
+
+const STREAM_TYPE_LABELS = {
+  srt: 'MPEG-TS/SRT',
+  efp: 'EFP/SRT',
+  whip: 'WHIP',
+  html: 'HTML',
+  test1: 'Pinwheel',
+  test2: 'Colors',
+} as const
+
+// ---------------------------------------------------------------------------
 // Shared select style
 // ---------------------------------------------------------------------------
 
@@ -47,11 +60,25 @@ function SlotRow({ index: _index, currentSourceId, canRemove, onChange, onRemove
     <div className="flex items-center gap-2">
       <select value={currentSourceId} onChange={(e) => onChange(e.target.value)} className={`${selectCls} flex-1`}>
         <option value="">— unassigned —</option>
-        {sources.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name} ({s.streamType.toUpperCase()})
-          </option>
-        ))}
+        {Object.entries(
+          [...sources].sort((a, b) => a.name.localeCompare(b.name)).reduce<Record<string, typeof sources>>((acc, s) => {
+            ;(acc[s.streamType] ??= []).push(s)
+            return acc
+          }, {}),
+        )
+          .sort(([a], [b]) => {
+            const ORDER = ['srt', 'efp', 'html', 'whip']
+            const ai = ORDER.indexOf(a), bi = ORDER.indexOf(b)
+            if (ai !== -1 && bi !== -1) return ai - bi
+            if (ai !== -1) return -1
+            if (bi !== -1) return 1
+            return a.localeCompare(b)
+          })
+          .map(([type, group]) => (
+            <optgroup key={type} label={STREAM_TYPE_LABELS[type as keyof typeof STREAM_TYPE_LABELS] ?? type.toUpperCase()}>
+              {group.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </optgroup>
+          ))}
         <optgroup label="WebRTC">
           <option value="Whip">WHIP Input</option>
         </optgroup>
@@ -92,7 +119,7 @@ function GfxSlotRow({ dskInput: _dskInput, currentGraphicId, onChange }: GfxSlot
     <div className="flex items-center gap-2">
       <select value={currentGraphicId} onChange={(e) => onChange(e.target.value)} className={`${selectCls} flex-1`}>
         <option value="">— none —</option>
-        {graphics.map((g) => (
+        {[...graphics].sort((a, b) => a.name.localeCompare(b.name)).map((g) => (
           <option key={g.id} value={g.id}>{g.name}</option>
         ))}
       </select>
@@ -131,12 +158,34 @@ function OutputSlotRow({ value, usedIds, takenByOtherIds, canRemove, onChange, o
     <div className="flex items-center gap-2">
       <select value={value} onChange={(e) => onChange(e.target.value)} className={`${selectCls} flex-1`}>
         <option value="">— none —</option>
-        {outputs
-          .filter((o) => o.id === value || o.outputType === 'whep' || !usedIds.includes(o.id))
-          .map((o) => (
-            <option key={o.id} value={o.id}>{o.name} ({OUTPUT_TYPE_LABELS[o.outputType] ?? o.outputType})</option>
+        {Object.entries(
+          [...outputs]
+            .filter((o) => o.id === value || !usedIds.includes(o.id))
+            .filter((o) => o.outputType !== 'whep')
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .reduce<Record<string, typeof outputs>>((acc, o) => {
+              ;(acc[o.outputType] ??= []).push(o)
+              return acc
+            }, {}),
+        )
+          .sort(([a], [b]) => {
+            const ORDER = ['mpegtssrt', 'efpsrt']
+            const ai = ORDER.indexOf(a), bi = ORDER.indexOf(b)
+            if (ai !== -1 && bi !== -1) return ai - bi
+            if (ai !== -1) return -1
+            if (bi !== -1) return 1
+            return a.localeCompare(b)
+          })
+          .map(([type, group]) => (
+            <optgroup key={type} label={OUTPUT_TYPE_LABELS[type] ?? type.toUpperCase()}>
+              {group.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </optgroup>
           ))}
         <optgroup label="WebRTC">
+          {outputs
+            .filter((o) => o.outputType === 'whep' && (o.id === value || !usedIds.includes(o.id)))
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
           <option value={VIRTUAL_OUTPUT_ID}>WHEP Output</option>
         </optgroup>
       </select>
@@ -867,9 +916,23 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
 export function ProductionsPanel() {
   const { productions, isLoading, removeProduction, updateStatus, fetchAll } = useProductionsStore()
   const { activeProductionId, setActiveProduction } = useProductionStore()
-  const { fetchAll: fetchTemplates, templates } = useTemplatesStore()
+  const templates = useTemplatesStore((s) => s.templates)
   const outputs = useOutputsStore((s) => s.outputs)
   const navigate = useNavigate()
+
+  const fetchSources = useSourcesStore((s) => s.fetchAll)
+  const fetchGraphics = useGraphicsStore((s) => s.fetchAll)
+  const fetchOutputs = useOutputsStore((s) => s.fetchAll)
+
+  // Poll productions every 15s; pre-load supporting resources once for modals
+  useEffect(() => {
+    void fetchAll()
+    void fetchSources()
+    void fetchGraphics()
+    void fetchOutputs()
+    const id = setInterval(() => void fetchAll(), 15000)
+    return () => clearInterval(id)
+  }, [fetchAll, fetchSources, fetchGraphics, fetchOutputs])
 
   // Ticks every second so on-air pills update in real time
   const [now, setNow] = useState(() => Date.now())
@@ -883,11 +946,6 @@ export function ProductionsPanel() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [deactivateTargetId, setDeactivateTargetId] = useState<string | null>(null)
   const [activationError, setActivationError] = useState<{ prodId: string; message: string } | null>(null)
-
-  // Fetch templates when panel mounts
-  useEffect(() => {
-    void fetchTemplates()
-  }, [fetchTemplates])
 
   async function handleDelete(id: string) {
     await removeProduction(id)
@@ -915,7 +973,7 @@ export function ProductionsPanel() {
 
       {/* Production list */}
       <div className="flex flex-col gap-2">
-        {productions.map((prod) => {
+        {[...productions].sort((a, b) => a.name.localeCompare(b.name)).map((prod) => {
           const isActive = prod.status === 'active'
           const isActivating = prod.status === 'activating'
           const template = templates.find((t) => t.id === prod.templateId)

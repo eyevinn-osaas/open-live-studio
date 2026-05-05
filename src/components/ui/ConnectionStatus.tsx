@@ -44,9 +44,11 @@ function StatusRow({ label, ok }: { label: string; ok: boolean | null }) {
 export function ConnectionStatus() {
   const [state, setState] = useState<State>({ openLive: null, db: null, strom: null })
   const [hover, setHover] = useState(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastFetchedAt = useRef<number>(0)
 
-  async function poll() {
+  async function fetchStatus() {
+    if (Date.now() - lastFetchedAt.current < 5000) return
+    lastFetchedAt.current = Date.now()
     try {
       const data: ApiStatus = await statusApi.get()
       setState({ openLive: true, db: data.db, strom: data.strom })
@@ -55,18 +57,19 @@ export function ConnectionStatus() {
     }
   }
 
-  useEffect(() => {
-    poll()
-    intervalRef.current = setInterval(poll, 5000)
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [])
+  useEffect(() => { void fetchStatus() }, [])
+
+  function handleMouseEnter() {
+    setHover(true)
+    void fetchStatus()
+  }
 
   const level = deriveLevel(state)
 
   return (
     <div
       className="relative flex justify-center"
-      onMouseEnter={() => setHover(true)}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHover(false)}
     >
       <GlobeIcon className={`w-7 h-7 transition-colors ${ICON_COLOR[level]}`} />

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useGraphicsStore } from '@/store/graphics.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { Button } from '@/components/ui/Button'
@@ -18,8 +18,14 @@ function isValidHttpUrl(s: string): boolean {
 }
 
 export function GraphicsPanel() {
-  const { graphics, isLoading, lastFetchedAt, addGraphic, updateGraphic, removeGraphic } = useGraphicsStore()
+  const { graphics, isLoading, lastFetchedAt, addGraphic, updateGraphic, removeGraphic, fetchAll } = useGraphicsStore()
   const productions = useProductionsStore((s) => s.productions)
+
+  useEffect(() => {
+    void fetchAll()
+    const id = setInterval(() => void fetchAll(), 15000)
+    return () => clearInterval(id)
+  }, [fetchAll])
 
   // Graphic IDs currently assigned to an active or activating production
   const activeGraphicIds = new Set(
@@ -70,7 +76,7 @@ export function GraphicsPanel() {
       </div>
 
       <div className="flex flex-col gap-1">
-        {graphics.map((g) => {
+        {[...graphics].sort((a, b) => a.name.localeCompare(b.name)).map((g) => {
           const inActiveProduction = activeGraphicIds.has(g.id)
           return (
             <div

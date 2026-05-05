@@ -13,6 +13,8 @@ import { TimerBar } from './TimerBar'
 import { useProductionStore } from '@/store/production.store'
 import { useIsOnAir } from '@/store/programClock.store'
 import { useProductionsStore } from '@/store/productions.store'
+import { useSourcesStore } from '@/store/sources.store'
+import { useGraphicsStore } from '@/store/graphics.store'
 import { useStatsStore } from '@/store/stats.store'
 import { useAudioStore } from '@/store/audio.store'
 import { audioApi } from '@/lib/api'
@@ -163,6 +165,9 @@ function AudioIcon() {
 export function ControllerPage() {
   const { cut, auto, ftb, setPvw, pvwInput, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
+  const fetchProductions = useProductionsStore((s) => s.fetchAll)
+  const fetchSources = useSourcesStore((s) => s.fetchAll)
+  const fetchGraphics = useGraphicsStore((s) => s.fetchAll)
   const activeProduction = useProductionsStore((s) => s.productions.find((p) => p.id === activeProductionId))
   const whepEndpoint = useProductionsStore(
     (s) => s.productions.find((p) => p.id === activeProductionId)?.whepEndpoint,
@@ -171,6 +176,14 @@ export function ControllerPage() {
     (s) => s.productions.find((p) => p.id === activeProductionId)?.pgmWhepEndpoint,
   )
   const isOnAir = useIsOnAir()
+
+  useEffect(() => {
+    void fetchProductions()
+    void fetchSources()
+    void fetchGraphics()
+    const id = setInterval(() => void fetchProductions(), 15000)
+    return () => clearInterval(id)
+  }, [fetchProductions, fetchSources, fetchGraphics])
 
   const [searchParams] = useSearchParams()
   const [panels, setPanels] = useState<Panels>(loadPanels)

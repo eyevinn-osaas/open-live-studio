@@ -8,7 +8,7 @@ import { useProductionsStore } from '@/store/productions.store'
 async function fetchServerOffset(): Promise<number> {
   try {
     const before = Date.now()
-    const res = await fetch(`${BASE}/health`, { method: 'HEAD', cache: 'no-store' })
+    const res = await fetch(`${BASE}/api/v1/ping`, { method: 'HEAD', cache: 'no-store' })
     const after = Date.now()
     const serverDateStr = res.headers.get('Date')
     if (!serverDateStr) return 0

@@ -50,7 +50,7 @@ export function SourceBus() {
       </span>
       <p className="text-[10px] text-[--color-text-muted]">Click to preview · Double-click to cut</p>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {sources.map((src) => (
+        {[...sources].sort((a, b) => a.name.localeCompare(b.name)).map((src) => (
           <div key={src.id} className="w-[140px] flex-shrink-0">
             <SourceCell sourceId={src.id} />
           </div>
