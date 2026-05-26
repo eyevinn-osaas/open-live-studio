@@ -9,12 +9,13 @@ import { PgmPreview, type PgmPreviewHandle } from './PgmPreview'
 import { TransitionPanel } from './TransitionPanel'
 import { DskPanel } from './DskPanel'
 import { MacroBar } from './MacroBar'
+import { PipPanel } from './PipPanel'
 import { AudioPanel } from './AudioPanel'
 import { TimerBar } from './TimerBar'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { useProductionStore } from '@/store/production.store'
+import { useProductionStore, type PipConfig } from '@/store/production.store'
 import { useIsOnAir } from '@/store/programClock.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { useSourcesStore } from '@/store/sources.store'
@@ -28,7 +29,7 @@ import { audioApi, type ApiProduction } from '@/lib/api'
 
 const PANELS_STORAGE_KEY = 'ol-studio-panels'
 
-type Panels = { multiviewer: boolean; controller: boolean; audio: boolean; pgm: boolean }
+type Panels = { multiviewer: boolean; controller: boolean; audio: boolean; pgm: boolean; pip: boolean }
 
 function loadPanels(): Panels {
   try {
@@ -40,10 +41,11 @@ function loadPanels(): Panels {
         controller:  p.controller  !== false,
         audio:       p.audio       !== false,
         pgm:         p.pgm         !== false,
+        pip:         p.pip         === true,
       }
     }
   } catch {}
-  return { multiviewer: true, controller: true, audio: true, pgm: true }
+  return { multiviewer: true, controller: true, audio: true, pgm: true, pip: false }
 }
 
 function savePanels(panels: Panels) {
@@ -298,6 +300,7 @@ function ControllerOptionsContent({
 }) {
   const sources = useSourcesStore((s) => s.sources)
   const sourceOffsets = useProductionStore((s) => s.sourceOffsets)
+  const sourceAudioOffsets = useProductionStore((s) => s.sourceAudioOffsets)
 
   // All edits are local until Done is pressed.
   const [draftTransitions, setDraftTransitions] = useState<string[]>(
@@ -305,6 +308,9 @@ function ControllerOptionsContent({
   )
   const [draftOffsets, setDraftOffsets] = useState<Record<string, number>>(
     () => ({ ...sourceOffsets }),
+  )
+  const [draftAudioOffsets, setDraftAudioOffsets] = useState<Record<string, number>>(
+    () => ({ ...sourceAudioOffsets }),
   )
 
   // Sort assignments by mixerInput for stable display order
@@ -324,6 +330,11 @@ function ControllerOptionsContent({
       const draft   = draftOffsets[mixerInput] ?? 0
       if (draft !== current) {
         send({ type: 'SOURCE_OFFSET_SET', mixerInput, offsetMs: draft })
+      }
+      const currentAudio = sourceAudioOffsets[mixerInput] ?? 0
+      const draftAudio   = draftAudioOffsets[mixerInput] ?? 0
+      if (draftAudio !== currentAudio) {
+        send({ type: 'SOURCE_AUDIO_OFFSET_SET', mixerInput, offsetMs: draftAudio })
       }
     }
 
@@ -363,8 +374,13 @@ function ControllerOptionsContent({
           <div className="flex flex-col gap-2 flex-1 min-w-0 border-l border-[--color-border] pl-6">
             <span className="text-xs text-[--color-text-muted]">Source timing (ms)</span>
             <p className="text-[10px] text-[--color-text-muted] leading-snug">
-              Positive values delay the source to align with slower cameras.
+              Positive values delay the source. Use audio delay to trim lipsync without touching video.
             </p>
+            <div className="flex items-center gap-2">
+              <span className="flex-1" />
+              <span className="text-[10px] text-[--color-text-muted] w-20 text-right">Video</span>
+              <span className="text-[10px] text-[--color-text-muted] w-20 text-right">Audio</span>
+            </div>
             {assignments.map((assignment) => {
               const src = sources.find((s) => s.id === assignment.sourceId)
               const name = src?.name ?? assignment.mixerInput
@@ -374,10 +390,17 @@ function ControllerOptionsContent({
                     {name}
                   </span>
                   <SourceOffsetInput
-                    label={name}
+                    label={`${name} video`}
                     draftValue={draftOffsets[assignment.mixerInput] ?? 0}
                     onChange={(val) =>
                       setDraftOffsets((prev) => ({ ...prev, [assignment.mixerInput]: val }))
+                    }
+                  />
+                  <SourceOffsetInput
+                    label={`${name} audio`}
+                    draftValue={draftAudioOffsets[assignment.mixerInput] ?? 0}
+                    onChange={(val) =>
+                      setDraftAudioOffsets((prev) => ({ ...prev, [assignment.mixerInput]: val }))
                     }
                   />
                 </div>
@@ -397,7 +420,7 @@ function ControllerOptionsContent({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function ControllerPage() {
-  const { cut, auto, ftb, setPvw, pvwInput, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
+  const { cut, auto, ftb, setPvw, pvwInput, pvwPip, pgmPip, pips, setPvwPip, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
   const fetchProductions = useProductionsStore((s) => s.fetchAll)
   const fetchSources = useSourcesStore((s) => s.fetchAll)
@@ -492,14 +515,22 @@ export function ControllerPage() {
   }, [activeProductionId, activeProduction?.status, setElements])
 
   const handleCut = useCallback(() => {
-    cut()
-    send({ type: 'CUT', mixerInput: pvwInput ?? '', afvRampMs: audioOptions.rampMs })
-  }, [cut, send, pvwInput, audioOptions.rampMs])
+    if (pvwPip !== null && pvwPip !== undefined) {
+      send({ type: 'TAKE', afvRampMs: audioOptions.rampMs })
+    } else {
+      cut()
+      send({ type: 'CUT', mixerInput: pvwInput ?? '', afvRampMs: audioOptions.rampMs })
+    }
+  }, [pvwPip, pvwInput, cut, send, audioOptions.rampMs])
 
   const handleAuto = useCallback(() => {
-    auto()
-    send({ type: 'TRANSITION', mixerInput: pvwInput ?? '', transitionType, durationMs: transitionDurationMs, afvRampMs: audioOptions.rampMs })
-  }, [auto, send, pvwInput, transitionType, transitionDurationMs, audioOptions.rampMs])
+    if (pvwPip !== null && pvwPip !== undefined) {
+      send({ type: 'TAKE', transitionType, durationMs: transitionDurationMs, afvRampMs: audioOptions.rampMs })
+    } else {
+      auto()
+      send({ type: 'TRANSITION', mixerInput: pvwInput ?? '', transitionType, durationMs: transitionDurationMs, afvRampMs: audioOptions.rampMs })
+    }
+  }, [pvwPip, pvwInput, auto, send, transitionType, transitionDurationMs, audioOptions.rampMs])
 
   const handleFtb = useCallback(() => { ftb(); send({ type: 'FTB', durationMs: transitionDurationMs }) }, [ftb, send, transitionDurationMs])
   const handleSetOvl = useCallback((alpha: number) => { send({ type: 'SET_OVL', alpha }) }, [send])
@@ -508,6 +539,15 @@ export function ControllerPage() {
     setPvw(mixerInput)
     send({ type: 'SET_PVW', mixerInput })
   }, [setPvw, send])
+
+  const handleSelectPvwPip = useCallback((pip: number) => {
+    setPvwPip(pip)
+    send({ type: 'SELECT_PVW_PIP', pip })
+  }, [setPvwPip, send])
+
+  const handleApplyPip = useCallback((pip: number, config: PipConfig) => {
+    send({ type: 'SET_PIP', pip, bg: config.bg, zones: config.zones })
+  }, [send])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -553,14 +593,22 @@ export function ControllerPage() {
     send({ type: 'MACRO_EXEC', macroId })
   }
 
+  const PipIcon = () => (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
+      <rect x="1" y="2" width="14" height="12" rx="1"/>
+      <rect x="9" y="8" width="5" height="4" rx="0.5" fill="currentColor" stroke="none"/>
+    </svg>
+  )
+
   const PANEL_ICONS = [
     { key: 'multiviewer', Icon: MultiviewerIcon },
     { key: 'pgm',         Icon: MonitorIcon     },
     { key: 'controller',  Icon: ControllerIcon  },
     { key: 'audio',       Icon: AudioIcon        },
+    { key: 'pip',         Icon: PipIcon          },
   ] as const
 
-  const showBottomRow = panels.controller || panels.audio
+  const showBottomRow = panels.controller || panels.audio || panels.pip
 
   return (
     <>
@@ -778,7 +826,7 @@ export function ControllerPage() {
                   <button type="button" onClick={() => setControllerOptionsOpen(true)} title="Controller options" className="cursor-pointer hover:text-[--color-text-primary] transition-colors"><GearIcon /></button>
                 }>Controller</SectionLabel>
                 <div className="flex flex-col flex-1 gap-2">
-                  <TransitionPanel onCut={handleCut} onAuto={handleAuto} onFtb={handleFtb} onSelectPvw={handleSelectPvw} onSetOvl={handleSetOvl} className="flex-1" visibleTransitions={controllerOptions.visibleTransitions} />
+                  <TransitionPanel onCut={handleCut} onAuto={handleAuto} onFtb={handleFtb} onSelectPvw={handleSelectPvw} onSetOvl={handleSetOvl} onSelectPvwPip={handleSelectPvwPip} pips={pips} pgmPip={pgmPip} pvwPip={pvwPip} className="flex-1" visibleTransitions={controllerOptions.visibleTransitions} />
                   <DskPanel onToggle={handleDskToggle} />
                   {false && activeProductionId && (
                     <MacroBar productionId={activeProductionId!} onExec={handleMacroExec} />
@@ -786,8 +834,14 @@ export function ControllerPage() {
                 </div>
               </div>
             )}
+            {panels.pip && activeProduction?.status === 'active' && (
+              <div className={`${panels.controller ? 'pr-3' : 'px-3'} flex flex-col gap-2 self-stretch shrink-0 overflow-hidden ${panels.controller || panels.audio ? '' : 'flex-1'}`} style={{ width: 540 }}>
+                <SectionLabel icon={<PipIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/pip?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('pip')}>PiP Editor</SectionLabel>
+                <PipPanel onApply={handleApplyPip} className="flex-1" />
+              </div>
+            )}
             {panels.audio && (
-              <div className={`flex flex-col gap-2 shrink-0 ${panels.controller ? 'pr-3' : 'px-3'}`} style={{ width: '40%' }}>
+              <div className={`flex flex-col gap-2 self-stretch shrink-0 ${panels.controller ? 'pr-3' : 'px-3'}`} style={{ width: '35%' }}>
                 <SectionLabel icon={<AudioIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/audio?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('audio')} actions={
                   <button type="button" onClick={() => setAudioOptionsOpen(true)} title="Audio options" className="cursor-pointer hover:text-[--color-text-primary] transition-colors"><GearIcon /></button>
                 }>Audio</SectionLabel>
