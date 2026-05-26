@@ -5,7 +5,6 @@ import { useControllerWs } from '@/hooks/useControllerWs'
 import { useProductionStore } from '@/store/production.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { useSourcesStore } from '@/store/sources.store'
-import { useTemplatesStore } from '@/store/templates.store'
 import { useGraphicsStore } from '@/store/graphics.store'
 import { useOutputsStore } from '@/store/outputs.store'
 import { useAudioStore } from '@/store/audio.store'
@@ -17,6 +16,8 @@ import { ProgramPreview } from '@/pages/ControllerPage/ProgramPreview'
 import { TransitionPanel } from '@/pages/ControllerPage/TransitionPanel'
 import { DskPanel } from '@/pages/ControllerPage/DskPanel'
 import { AudioPanel } from '@/pages/ControllerPage/AudioPanel'
+import { PipPanel } from '@/pages/ControllerPage/PipPanel'
+import type { PipConfig } from '@/store/production.store'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,15 @@ function AudioIcon() {
   )
 }
 
+function PipIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="12" height="12">
+      <rect x="1" y="2" width="14" height="12" rx="1"/>
+      <rect x="9" y="8" width="5" height="4" rx="0.5" fill="currentColor" stroke="none"/>
+    </svg>
+  )
+}
+
 // ─── Controller pane — zoomed to 50% of viewport height ──────────────────────
 
 const CONTROLLER_TARGET = 0.5  // fraction of viewport height the content should occupy
@@ -167,7 +177,7 @@ const TRANSITION_LABELS: Record<string, string> = {
   slide_up: 'Push Up', slide_down: 'Push Down',
 }
 
-type Pane = 'multiviewer' | 'controller' | 'audio' | 'pgm'
+type Pane = 'multiviewer' | 'controller' | 'audio' | 'pgm' | 'pip'
 
 // ─── PGM confidence monitor ───────────────────────────────────────────────────
 
@@ -218,15 +228,13 @@ export function PanePage() {
   // No Shell in this route — bootstrap all store data ourselves
   const fetchProductions = useProductionsStore((s) => s.fetchAll)
   const fetchSources     = useSourcesStore((s) => s.fetchAll)
-  const fetchTemplates   = useTemplatesStore((s) => s.fetchAll)
   const fetchGraphics    = useGraphicsStore((s) => s.fetchAll)
   const fetchOutputs     = useOutputsStore((s) => s.fetchAll)
 
   useEffect(() => {
-    void fetchTemplates()
     void fetchGraphics()
     void fetchOutputs()
-  }, [fetchTemplates, fetchGraphics, fetchOutputs])
+  }, [fetchGraphics, fetchOutputs])
 
   useEffect(() => {
     void fetchSources()
@@ -324,6 +332,9 @@ export function PanePage() {
   const handleSetOvl    = useCallback((alpha: number) => { send({ type: 'SET_OVL', alpha }) }, [send])
   const handleSelectPvw = useCallback((mixerInput: string) => { setPvw(mixerInput); send({ type: 'SET_PVW', mixerInput }) }, [setPvw, send])
   const handleDskToggle = (layer: number, visible: boolean) => { send({ type: 'DSK_TOGGLE', layer, visible }) }
+  const handleApplyPip = useCallback((pip: number, config: PipConfig) => {
+    send({ type: 'SET_PIP', pip, bg: config.bg, zones: config.zones })
+  }, [send])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (pane !== 'controller') return
@@ -406,6 +417,19 @@ export function PanePage() {
             numGroups={activeProduction?.values?.num_groups !== undefined ? parseInt(String(activeProduction.values.num_groups), 10) : 2}
             showEbuMain={activeProduction?.values?.ebu_main === true}
           />
+        </div>
+      )}
+
+      {/* ── PiP Editor ──────────────────────────────────────────────────────── */}
+      {pane === 'pip' && (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <PaneBar>
+            <PipIcon />
+            <span className="text-[10px] font-semibold uppercase tracking-widest">PiP Editor</span>
+          </PaneBar>
+          <div className="p-2 w-fit">
+            <PipPanel onApply={handleApplyPip} />
+          </div>
         </div>
       )}
 
