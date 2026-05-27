@@ -279,6 +279,10 @@ export const statusApi = {
   get: () => request<ApiStatus>('/api/v1/status'),
 }
 
+export const serverInfoApi = {
+  get: () => request<{ stromHost: string }>('/api/v1/server-info'),
+}
+
 export const productionConfigsApi = {
   list: () =>
     request<ProductionConfig[]>('/api/v1/production-configs'),

@@ -6,7 +6,7 @@ import { useProductionStore } from '@/store/production.store'
 import { useSourcesStore } from '@/store/sources.store'
 import { useGraphicsStore } from '@/store/graphics.store'
 import { useOutputsStore } from '@/store/outputs.store'
-import { productionsApi, productionConfigsApi } from '@/lib/api'
+import { productionsApi, productionConfigsApi, serverInfoApi } from '@/lib/api'
 import type { ProductionConfig, ProductionGraphicAssignment } from '@/lib/api'
 import { PRODUCTION_PROPERTIES, type TemplateProperty } from '@/lib/production-schema'
 import { Button } from '@/components/ui/Button'
@@ -165,8 +165,14 @@ function GfxSlotRow({ dskInput: _dskInput, currentGraphicId, onChange }: GfxSlot
 
 const VIRTUAL_OUTPUT_ID = '__whep__'
 
-function toCallerUrl(url: string): string {
-  return url.replace(/mode=listener/i, 'mode=caller')
+function toCallerUrl(url: string, stromHost?: string): string {
+  let result = url.replace(/mode=listener/i, 'mode=caller')
+  // SRT listener URIs have an empty host (srt://:port) because Strom binds on all
+  // interfaces. Fill in the Strom server's hostname so callers get a usable address.
+  if (stromHost && /^srt:\/\/:/.test(result)) {
+    result = result.replace(/^srt:\/\/:/, `srt://${stromHost}:`)
+  }
+  return result
 }
 
 const OUTPUT_TYPE_LABELS: Record<string, string> = {
@@ -934,12 +940,15 @@ export function ProductionsPanel() {
   const fetchGraphics = useGraphicsStore((s) => s.fetchAll)
   const fetchOutputs = useOutputsStore((s) => s.fetchAll)
 
+  const [stromHost, setStromHost] = useState<string | undefined>(undefined)
+
   // Poll productions every 15s; pre-load supporting resources once for modals
   useEffect(() => {
     void fetchAll()
     void fetchSources()
     void fetchGraphics()
     void fetchOutputs()
+    void serverInfoApi.get().then((info) => setStromHost(info.stromHost)).catch(() => {})
     const id = setInterval(() => void fetchAll(), 15000)
     return () => clearInterval(id)
   }, [fetchAll, fetchSources, fetchGraphics, fetchOutputs])
@@ -1080,12 +1089,12 @@ export function ProductionsPanel() {
                     <InlineCopyButton label="WHEP OUT: PGM" value={prod.pgmWhepEndpoint} />
                   )}
                   {isActive && prod.srtOutputUri && (
-                    <InlineCopyButton label="SRT OUT: Program" value={toCallerUrl(prod.srtOutputUri)} displayUrl={prod.srtOutputUri} />
+                    <InlineCopyButton label="SRT OUT: Program" value={toCallerUrl(prod.srtOutputUri, stromHost)} displayUrl={prod.srtOutputUri} />
                   )}
                   {isActive && prod.outputAssignments?.flatMap((a) => {
                     const out = outputs.find((o) => o.id === a.outputId)
                     if (!out || out.outputType === 'whep' || !out.url) return []
-                    return [<InlineCopyButton key={a.outputId} label={`SRT OUT: ${out.name}`} value={toCallerUrl(out.url)} displayUrl={out.url} />]
+                    return [<InlineCopyButton key={a.outputId} label={`SRT OUT: ${out.name}`} value={toCallerUrl(out.url, stromHost)} displayUrl={out.url} />]
                   })}
                   {isActive && prod.whepOutputUrls?.map((w) => {
                     const out = outputs.find((o) => o.id === w.outputId)

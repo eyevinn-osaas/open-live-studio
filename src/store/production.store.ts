@@ -33,6 +33,9 @@ interface ProductionState {
   sourceOffsets: Record<string, number>
   /** Runtime source audio time offsets: mixerInput → offsetMs. Synced via WS, reset on production change. */
   sourceAudioOffsets: Record<string, number>
+  /** AFV ramp durations synced from server. Defaults: rampUpMs=300, rampDownMs=50. */
+  afvRampUpMs: number
+  afvRampDownMs: number
   pgmPip: number | null
   pvwPip: number | null
   pips: PipConfig[]
@@ -53,6 +56,8 @@ interface ProductionActions {
   applySourceOffset: (mixerInput: string, offsetMs: number) => void
   /** Server-authoritative audio offset setter — called by WS handler on SOURCE_AUDIO_OFFSET_STATE */
   applySourceAudioOffset: (mixerInput: string, offsetMs: number) => void
+  /** Server-authoritative AFV ramp setter — called by WS handler on AFV_RAMP_STATE */
+  applyAfvRamp: (rampUpMs: number, rampDownMs: number) => void
   applyPipState: (pgmPip: number | null, pvwPip: number | null, pips: PipConfig[]) => void
   applyPipConfig: (pipIdx: number, config: PipConfig) => void
   setPvwPip: (pip: number | null) => void
@@ -72,6 +77,8 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       dskState: {},
       sourceOffsets: {},
       sourceAudioOffsets: {},
+      afvRampUpMs: 300,
+      afvRampDownMs: 50,
       pgmPip: null,
       pvwPip: null,
       pips: [],
@@ -133,6 +140,8 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
           state.dskState = {}
           state.sourceOffsets = {}
           state.sourceAudioOffsets = {}
+          state.afvRampUpMs = 300
+          state.afvRampDownMs = 50
           state.pgmPip = null
           state.pvwPip = null
           state.pips = []
@@ -158,6 +167,12 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       applySourceAudioOffset: (mixerInput, offsetMs) =>
         set((state) => {
           state.sourceAudioOffsets[mixerInput] = offsetMs
+        }),
+
+      applyAfvRamp: (rampUpMs, rampDownMs) =>
+        set((state) => {
+          state.afvRampUpMs = rampUpMs
+          state.afvRampDownMs = rampDownMs
         }),
 
       applyPipState: (pgmPip, pvwPip, pips) =>

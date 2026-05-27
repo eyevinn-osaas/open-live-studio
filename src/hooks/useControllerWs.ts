@@ -6,9 +6,9 @@ import { BASE } from '@/lib/base'
 const WS_BASE = BASE.replace(/^http/, 'ws')
 
 export type OutboundMessage =
-  | { type: 'CUT'; mixerInput: string; afvRampMs?: number }
-  | { type: 'TRANSITION'; mixerInput: string; transitionType: string; durationMs?: number; afvRampMs?: number }
-  | { type: 'TAKE'; transitionType?: string; durationMs?: number; afvRampMs?: number }
+  | { type: 'CUT'; mixerInput: string; afvRampUpMs?: number; afvRampDownMs?: number }
+  | { type: 'TRANSITION'; mixerInput: string; transitionType: string; durationMs?: number; afvRampUpMs?: number; afvRampDownMs?: number }
+  | { type: 'TAKE'; pip?: number; transitionType?: string; durationMs?: number; afvRampUpMs?: number; afvRampDownMs?: number }
   | { type: 'SET_PVW'; mixerInput: string }
   | { type: 'FTB'; active?: boolean; durationMs?: number }
   | { type: 'SET_OVL'; alpha: number }
@@ -20,6 +20,7 @@ export type OutboundMessage =
   | { type: 'MACRO_EXEC'; macroId: string }
   | { type: 'AUDIO_SET'; elementId: string; property: 'volume' | 'mute'; value: number | boolean; ramp_ms?: number }
   | { type: 'AFV_SET'; mixerInput: string; enabled: boolean }
+  | { type: 'AFV_RAMP_SET'; rampUpMs: number; rampDownMs: number }
   | { type: 'PFL_SET'; elementId: string; enabled: boolean; volume?: number }
   | { type: 'AFL_SET'; elementId: string; enabled: boolean }
   | { type: 'AUX_SEND_SET'; elementId: string; auxBus: number; level: number; enabled: boolean; pre?: boolean }
@@ -60,6 +61,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
   const applyLoudness        = useAudioStore((s) => s.applyLoudness)
   const applySourceOffset      = useProductionStore((s) => s.applySourceOffset)
   const applySourceAudioOffset = useProductionStore((s) => s.applySourceAudioOffset)
+  const applyAfvRamp           = useProductionStore((s) => s.applyAfvRamp)
   const applyPipState          = useProductionStore((s) => s.applyPipState)
 
   useEffect(() => {
@@ -165,6 +167,12 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
           case 'SOURCE_AUDIO_OFFSET_STATE': {
             if (typeof msg['mixerInput'] === 'string' && typeof msg['offsetMs'] === 'number') {
               applySourceAudioOffset(msg['mixerInput'] as string, msg['offsetMs'] as number)
+            }
+            break
+          }
+          case 'AFV_RAMP_STATE': {
+            if (typeof msg['rampUpMs'] === 'number' && typeof msg['rampDownMs'] === 'number') {
+              applyAfvRamp(msg['rampUpMs'] as number, msg['rampDownMs'] as number)
             }
             break
           }

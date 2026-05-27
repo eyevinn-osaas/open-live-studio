@@ -42,15 +42,52 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
   const [editingPipIdx, setEditingPipIdx] = useState(0)
   const [draft, setDraft] = useState<PipConfig>({ bg: null, zones: [] })
   const [activeZoneIdx, setActiveZoneIdx] = useState(0)
+  const [editMode, setEditMode] = useState(false)
   const isDirtyRef = useRef(false)
+  const applyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Reset all editor state when the active production changes
+  const prevProductionIdRef = useRef(activeProductionId)
+  useEffect(() => {
+    if (prevProductionIdRef.current === activeProductionId) return
+    prevProductionIdRef.current = activeProductionId
+    if (applyTimerRef.current) clearTimeout(applyTimerRef.current)
+    isDirtyRef.current = false
+    setEditingPipIdx(0)
+    setActiveZoneIdx(0)
+    setEditMode(false)
+    setDraft({ bg: null, zones: [] })
+  }, [activeProductionId])
 
   // Sync draft from server pips (only when not dirty)
   useEffect(() => {
     if (isDirtyRef.current) return
     const pip = pips[editingPipIdx]
     setDraft(pip ? structuredClone(pip) : { bg: null, zones: [] })
-    setActiveZoneIdx(0)
   }, [pips, editingPipIdx])
+
+  // Reset zone selection only when switching PiP tabs
+  const prevPipIdxRef = useRef(editingPipIdx)
+  useEffect(() => {
+    if (prevPipIdxRef.current !== editingPipIdx) {
+      prevPipIdxRef.current = editingPipIdx
+      setActiveZoneIdx(0)
+    }
+  }, [editingPipIdx])
+
+  // Auto-apply: fire onApply 300ms after any draft change
+  useEffect(() => {
+    if (!isDirtyRef.current) return
+    if (applyTimerRef.current) clearTimeout(applyTimerRef.current)
+    applyTimerRef.current = setTimeout(() => {
+      applyTimerRef.current = null
+      isDirtyRef.current = false
+      onApply(editingPipIdx, draft)
+    }, 300)
+    return () => {
+      if (applyTimerRef.current) clearTimeout(applyTimerRef.current)
+    }
+  }, [draft, editingPipIdx, onApply])
 
   // Input slots: same pattern as TransitionPanel
   const VIRTUAL_SOURCE_NAMES: Record<string, string> = { '__test1__': 'PINWHEEL', '__test2__': 'COLORS' }
@@ -231,185 +268,238 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
     )
   }
 
+  const flushPending = () => {
+    if (isDirtyRef.current) {
+      if (applyTimerRef.current) clearTimeout(applyTimerRef.current)
+      onApply(editingPipIdx, draft)
+      isDirtyRef.current = false
+    }
+  }
+
   return (
     <div className={cn('flex flex-col gap-2 p-2 border border-zinc-800 bg-zinc-950', className)}>
-      {/* PiP tab selector */}
-      {pips.length > 1 && (
-        <div className="flex gap-1">
-          {pips.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => { setEditingPipIdx(i); isDirtyRef.current = false }}
-              className={cn(
-                'px-2 py-0.5 text-[10px] font-bold border',
-                editingPipIdx === i
-                  ? 'bg-orange-500 text-black border-orange-400'
-                  : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200',
-              )}
-            >
-              PiP {i + 1}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Canvas + right panel side by side */}
-      <div className="flex gap-2">
-        {/* Zone canvas */}
-        <div
-          ref={canvasRef}
-          className="relative select-none overflow-hidden shrink-0"
-          style={{ width: 420, aspectRatio: '16/9', background: '#111', border: '1px solid #3f3f46' }}
+      {/* Header row: pip tabs + edit/done toggle */}
+      <div className="flex items-center gap-1">
+        {pips.length > 1 && pips.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => {
+              flushPending()
+              setEditingPipIdx(i)
+            }}
+            className={cn(
+              'px-2 py-0.5 text-[10px] font-bold border',
+              editingPipIdx === i
+                ? 'bg-orange-500 text-black border-orange-400'
+                : 'bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200',
+            )}
+          >
+            PiP {i + 1}
+          </button>
+        ))}
+        <button
+          onClick={() => {
+            flushPending()
+            setEditMode((m) => !m)
+          }}
+          className={cn(
+            'ml-auto px-2 py-0.5 text-[10px] font-bold border',
+            editMode
+              ? 'bg-zinc-700 text-zinc-200 border-zinc-500 hover:bg-zinc-600'
+              : 'bg-zinc-900 text-zinc-500 border-zinc-700 hover:text-zinc-300',
+          )}
         >
-          {draft.zones.map((zone, zIdx) => {
-            const r = zone.rect ?? { x: 0, y: 0, w: 1, h: 1 }
-            const isActive = zIdx === activeZoneIdx
-            const color = ZONE_COLORS[zIdx % ZONE_COLORS.length]!
-            return (
-              <div
-                key={zIdx}
-                style={{
-                  position: 'absolute',
-                  left: `${r.x * 100}%`,
-                  top: `${r.y * 100}%`,
-                  width: `${r.w * 100}%`,
-                  height: `${r.h * 100}%`,
-                  border: `2px solid ${color}`,
-                  background: isActive ? `${color}33` : `${color}11`,
-                  cursor: 'move',
-                  boxSizing: 'border-box',
-                }}
-                onMouseDown={(e) => startDrag(e, zIdx, null)}
-              >
-                <div
-                  style={{
-                    position: 'absolute', top: 0, left: 0,
-                    fontSize: 9, fontWeight: 700, padding: '1px 3px',
-                    color, background: 'rgba(0,0,0,0.65)', lineHeight: 1.4,
-                    pointerEvents: 'none',
-                  }}
-                >
-                  Z{zIdx + 1}{zone.sources.length > 0 ? `: ${zone.sources.map((s) => s + 1).join(',')}` : ''}
-                </div>
-                {zone.rect === null && (
-                  <div style={{ position: 'absolute', inset: 0, border: '1px dashed', borderColor: color, margin: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 9, color, opacity: 0.7 }}>AUTO</span>
-                  </div>
-                )}
-                {isActive && HANDLES.map((h) => (
-                  <div
-                    key={h}
-                    style={{
-                      position: 'absolute',
-                      width: 8, height: 8,
-                      background: color,
-                      border: '1px solid rgba(0,0,0,0.5)',
-                      ...HANDLE_POSITIONS[h],
-                    }}
-                    onMouseDown={(e) => startDrag(e, zIdx, h)}
-                  />
-                ))}
-              </div>
-            )
-          })}
-          {draft.bg !== null && (
-            <div style={{ position: 'absolute', bottom: 4, left: 4, fontSize: 8, color: '#a1a1aa', background: 'rgba(0,0,0,0.6)', padding: '1px 4px' }}>
-              BG: {(inputSlots[draft.bg]?.name ?? String(draft.bg + 1))}
-            </div>
-          )}
-          {draft.zones.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] text-zinc-600">Click a source below to fill this PiP</span>
-            </div>
-          )}
-        </div>
-
-        {/* Right panel: background + zones + apply */}
-        <div className="flex-1 flex flex-col gap-2 min-w-0">
-          {/* Background picker */}
-          <div>
-            <label className="text-[9px] text-zinc-500 uppercase tracking-wider block mb-0.5">Background</label>
-            <select
-              value={draft.bg ?? ''}
-              onChange={(e) => { setBg(e.target.value === '' ? null : parseInt(e.target.value, 10)) }}
-              className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] px-1 py-0.5 focus:outline-none"
-            >
-              <option value="">None</option>
-              {inputSlots.map((slot) => (
-                <option key={slot.idx} value={slot.idx} disabled={isInAnyZone(slot.idx)}>
-                  {slot.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Zone list */}
-          <div className="flex flex-col gap-0.5 flex-1 min-h-0">
-            <div className="flex items-center justify-between mb-0.5">
-              <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Zones</span>
-              <button
-                onClick={addZone}
-                className="text-[9px] px-1.5 py-0.5 bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-200 hover:border-zinc-500"
-              >
-                + Add
-              </button>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              {draft.zones.map((zone, zIdx) => {
-                const color = ZONE_COLORS[zIdx % ZONE_COLORS.length]!
-                return (
-                  <div
-                    key={zIdx}
-                    className={cn(
-                      'flex items-center gap-0.5 px-1 py-0.5 border cursor-pointer',
-                      zIdx === activeZoneIdx ? 'border-orange-500 bg-zinc-800' : 'border-zinc-700 bg-zinc-900 hover:border-zinc-600',
-                    )}
-                    onClick={() => setActiveZoneIdx(zIdx)}
-                  >
-                    <div style={{ width: 6, height: 6, background: color, borderRadius: 1, flexShrink: 0 }} />
-                    <span className="text-[9px] text-zinc-400 font-bold">Z{zIdx + 1}</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="∞"
-                      value={zone.capacity ?? ''}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        const v = e.target.value === '' ? null : parseInt(e.target.value, 10)
-                        setZoneCapacity(zIdx, Number.isFinite(v) ? v : null)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-6 bg-transparent border-0 text-zinc-300 text-[9px] text-center focus:outline-none"
-                    />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); removeZone(zIdx) }}
-                      className="ml-auto text-[9px] text-zinc-600 hover:text-red-400 leading-none px-0.5"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Apply — pinned to bottom of canvas-height-constrained right panel */}
-          <div className="flex justify-end mt-auto">
-            <button
-              onClick={() => { onApply(editingPipIdx, draft); isDirtyRef.current = false }}
-              className="px-3 py-1 text-[10px] font-bold bg-orange-500 text-black border border-orange-400 hover:bg-orange-400 uppercase tracking-widest"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
+          {editMode ? 'Done' : 'Edit'}
+        </button>
       </div>
 
-      {/* Source chips — always visible; clicking when no zones creates a full-screen zone */}
+      {editMode ? (
+        /* ── EDIT MODE: canvas + zone management ── */
+        <div className="flex gap-2">
+          {/* Zone canvas */}
+          <div
+            ref={canvasRef}
+            className="relative select-none overflow-hidden shrink-0"
+            style={{ width: 420, aspectRatio: '16/9', background: '#111', border: '1px solid #3f3f46' }}
+          >
+            {draft.zones.map((zone, zIdx) => {
+              const r = zone.rect ?? { x: 0, y: 0, w: 1, h: 1 }
+              const isActive = zIdx === activeZoneIdx
+              const color = ZONE_COLORS[zIdx % ZONE_COLORS.length]!
+              return (
+                <div
+                  key={zIdx}
+                  style={{
+                    position: 'absolute',
+                    left: `${r.x * 100}%`,
+                    top: `${r.y * 100}%`,
+                    width: `${r.w * 100}%`,
+                    height: `${r.h * 100}%`,
+                    border: `2px solid ${color}`,
+                    background: isActive ? `${color}33` : `${color}11`,
+                    cursor: 'move',
+                    boxSizing: 'border-box',
+                  }}
+                  onMouseDown={(e) => startDrag(e, zIdx, null)}
+                >
+                  <div
+                    style={{
+                      position: 'absolute', top: 0, left: 0,
+                      fontSize: 9, fontWeight: 700, padding: '1px 3px',
+                      color, background: 'rgba(0,0,0,0.65)', lineHeight: 1.4,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    Z{zIdx + 1}{zone.sources.length > 0 ? `: ${zone.sources.map((s) => s + 1).join(',')}` : ''}
+                  </div>
+                  {zone.rect === null && (
+                    <div style={{ position: 'absolute', inset: 0, border: '1px dashed', borderColor: color, margin: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 9, color, opacity: 0.7 }}>AUTO</span>
+                    </div>
+                  )}
+                  {isActive && HANDLES.map((h) => (
+                    <div
+                      key={h}
+                      style={{
+                        position: 'absolute',
+                        width: 8, height: 8,
+                        background: color,
+                        border: '1px solid rgba(0,0,0,0.5)',
+                        ...HANDLE_POSITIONS[h],
+                      }}
+                      onMouseDown={(e) => startDrag(e, zIdx, h)}
+                    />
+                  ))}
+                </div>
+              )
+            })}
+            {draft.bg !== null && (
+              <div style={{ position: 'absolute', bottom: 4, left: 4, fontSize: 8, color: '#a1a1aa', background: 'rgba(0,0,0,0.6)', padding: '1px 4px' }}>
+                BG: {(inputSlots[draft.bg]?.name ?? String(draft.bg + 1))}
+              </div>
+            )}
+            {draft.zones.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[10px] text-zinc-600">Click a source below to add a zone</span>
+              </div>
+            )}
+          </div>
+
+          {/* Right panel: background + zone list */}
+          <div className="flex-1 flex flex-col gap-2 min-w-0">
+            <div>
+              <label className="text-[9px] text-zinc-500 uppercase tracking-wider block mb-0.5">Background</label>
+              <select
+                value={draft.bg ?? ''}
+                onChange={(e) => { setBg(e.target.value === '' ? null : parseInt(e.target.value, 10)) }}
+                className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] px-1 py-0.5 focus:outline-none"
+              >
+                <option value="">None</option>
+                {inputSlots.map((slot) => (
+                  <option key={slot.idx} value={slot.idx} disabled={isInAnyZone(slot.idx)}>
+                    {slot.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-0.5 flex-1 min-h-0">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Zones</span>
+                <button
+                  onClick={addZone}
+                  className="text-[9px] px-1.5 py-0.5 bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-200 hover:border-zinc-500"
+                >
+                  + Add
+                </button>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {draft.zones.map((zone, zIdx) => {
+                  const color = ZONE_COLORS[zIdx % ZONE_COLORS.length]!
+                  return (
+                    <div
+                      key={zIdx}
+                      className={cn(
+                        'flex items-center gap-0.5 px-1 py-0.5 border cursor-pointer',
+                        zIdx === activeZoneIdx ? 'border-orange-500 bg-zinc-800' : 'border-zinc-700 bg-zinc-900 hover:border-zinc-600',
+                      )}
+                      onClick={() => setActiveZoneIdx(zIdx)}
+                    >
+                      <div style={{ width: 6, height: 6, background: color, borderRadius: 1, flexShrink: 0 }} />
+                      <span className="text-[9px] text-zinc-400 font-bold">Z{zIdx + 1}</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="∞"
+                        value={zone.capacity ?? ''}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          const v = e.target.value === '' ? null : parseInt(e.target.value, 10)
+                          setZoneCapacity(zIdx, Number.isFinite(v) ? v : null)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-6 bg-transparent border-0 text-zinc-300 text-[9px] text-center focus:outline-none"
+                      />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeZone(zIdx) }}
+                        className="ml-auto text-[9px] text-zinc-600 hover:text-red-400 leading-none px-0.5"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── VIEW MODE: zone selector only ── */
+        draft.zones.length > 0 ? (
+          <div className="flex flex-col gap-0.5">
+            {draft.zones.map((zone, zIdx) => {
+              const color = ZONE_COLORS[zIdx % ZONE_COLORS.length]!
+              const sourceNames = zone.sources.map((s) => inputSlots[s]?.name ?? String(s + 1))
+              return (
+                <div
+                  key={zIdx}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2 py-1 border cursor-pointer',
+                    zIdx === activeZoneIdx ? 'border-orange-500 bg-zinc-800' : 'border-zinc-700 bg-zinc-900 hover:border-zinc-600',
+                  )}
+                  onClick={() => setActiveZoneIdx(zIdx)}
+                >
+                  <div style={{ width: 8, height: 8, background: color, borderRadius: 1, flexShrink: 0 }} />
+                  <span className="text-[10px] font-bold" style={{ color }}>Z{zIdx + 1}</span>
+                  {zone.capacity !== null && (
+                    <span className="text-[9px] text-zinc-500">{zone.sources.length}/{zone.capacity}</span>
+                  )}
+                  <div className="flex gap-0.5 flex-wrap ml-1">
+                    {sourceNames.map((name, i) => (
+                      <span key={i} className="text-[9px] bg-zinc-700 text-zinc-200 px-1 py-0.5">{name}</span>
+                    ))}
+                    {sourceNames.length === 0 && (
+                      <span className="text-[9px] text-zinc-600 italic">empty</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="py-2 text-center text-[10px] text-zinc-600">
+            Click a source below to fill this PiP
+          </div>
+        )
+      )}
+
+      {/* Source chips — always visible */}
       <div>
         <span className="text-[9px] text-zinc-500 uppercase tracking-wider block mb-1">
-          {draft.zones.length === 0 ? 'Sources' : `Sources → Zone ${activeZoneIdx + 1}`}
+          {editMode
+            ? (draft.zones.length === 0 ? 'Sources' : `Sources → Zone ${activeZoneIdx + 1}`)
+            : (draft.zones.length === 0 ? 'Sources' : `Sources → Zone ${activeZoneIdx + 1}`)}
         </span>
         <div className="flex flex-wrap gap-1">
           {inputSlots.map((slot) => {
