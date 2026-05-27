@@ -65,22 +65,9 @@ const TRANSITION_LABELS: Record<string, string> = {
   slide_down:  'Push Down',
 }
 
-const AUDIO_OPTIONS_KEY      = 'ol-studio-audio-options'
 const CONTROLLER_OPTIONS_KEY = 'ol-studio-controller-options'
 
-type AudioOptions      = { rampMs: number }
 type ControllerOptions = { visibleTransitions: string[] }
-
-function loadAudioOptions(): AudioOptions {
-  try {
-    const raw = localStorage.getItem(AUDIO_OPTIONS_KEY)
-    if (raw) {
-      const p = JSON.parse(raw) as Partial<AudioOptions>
-      return { rampMs: typeof p.rampMs === 'number' ? p.rampMs : 200 }
-    }
-  } catch {}
-  return { rampMs: 200 }
-}
 
 function loadControllerOptions(): ControllerOptions {
   try {
@@ -420,7 +407,7 @@ function ControllerOptionsContent({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function ControllerPage() {
-  const { cut, auto, ftb, setPvw, pvwInput, pvwPip, pgmPip, pips, setPvwPip, transitionType, transitionDurationMs, activeProductionId, setActiveProduction } = useProductionStore()
+  const { cut, auto, ftb, setPvw, pvwInput, pvwPip, pgmPip, pgmInput, pips, setPvwPip, transitionType, transitionDurationMs, activeProductionId, setActiveProduction, afvRampUpMs, afvRampDownMs, dskState } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
   const fetchProductions = useProductionsStore((s) => s.fetchAll)
   const fetchSources = useSourcesStore((s) => s.fetchAll)
@@ -465,11 +452,16 @@ export function ControllerPage() {
   const [panels, setPanels] = useState<Panels>(loadPanels)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isPgmFullscreen, setIsPgmFullscreen] = useState(false)
-  const [audioOptions, setAudioOptions] = useState<AudioOptions>(loadAudioOptions)
   const [controllerOptions, setControllerOptions] = useState<ControllerOptions>(loadControllerOptions)
   const [audioOptionsOpen, setAudioOptionsOpen] = useState(false)
-  const [rampMsText, setRampMsText] = useState(() => String(loadAudioOptions().rampMs))
-  useEffect(() => { if (audioOptionsOpen) setRampMsText(String(audioOptions.rampMs)) }, [audioOptionsOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [rampUpMsText, setRampUpMsText] = useState(() => String(afvRampUpMs))
+  const [rampDownMsText, setRampDownMsText] = useState(() => String(afvRampDownMs))
+  useEffect(() => {
+    if (audioOptionsOpen) {
+      setRampUpMsText(String(afvRampUpMs))
+      setRampDownMsText(String(afvRampDownMs))
+    }
+  }, [audioOptionsOpen]) // eslint-disable-line react-hooks/exhaustive-deps
   const [controllerOptionsOpen, setControllerOptionsOpen] = useState(false)
   const multiviewerRef = useRef<HTMLDivElement>(null)
   const pgmRef = useRef<HTMLDivElement>(null)
@@ -516,21 +508,21 @@ export function ControllerPage() {
 
   const handleCut = useCallback(() => {
     if (pvwPip !== null && pvwPip !== undefined) {
-      send({ type: 'TAKE', afvRampMs: audioOptions.rampMs })
+      send({ type: 'TAKE', afvRampUpMs, afvRampDownMs })
     } else {
       cut()
-      send({ type: 'CUT', mixerInput: pvwInput ?? '', afvRampMs: audioOptions.rampMs })
+      send({ type: 'CUT', mixerInput: pvwInput ?? '', afvRampUpMs, afvRampDownMs })
     }
-  }, [pvwPip, pvwInput, cut, send, audioOptions.rampMs])
+  }, [pvwPip, pvwInput, cut, send, afvRampUpMs, afvRampDownMs])
 
   const handleAuto = useCallback(() => {
     if (pvwPip !== null && pvwPip !== undefined) {
-      send({ type: 'TAKE', transitionType, durationMs: transitionDurationMs, afvRampMs: audioOptions.rampMs })
+      send({ type: 'TAKE', transitionType, durationMs: transitionDurationMs, afvRampUpMs, afvRampDownMs })
     } else {
       auto()
-      send({ type: 'TRANSITION', mixerInput: pvwInput ?? '', transitionType, durationMs: transitionDurationMs, afvRampMs: audioOptions.rampMs })
+      send({ type: 'TRANSITION', mixerInput: pvwInput ?? '', transitionType, durationMs: transitionDurationMs, afvRampUpMs, afvRampDownMs })
     }
-  }, [pvwPip, pvwInput, auto, send, transitionType, transitionDurationMs, audioOptions.rampMs])
+  }, [pvwPip, pvwInput, auto, send, transitionType, transitionDurationMs, afvRampUpMs, afvRampDownMs])
 
   const handleFtb = useCallback(() => { ftb(); send({ type: 'FTB', durationMs: transitionDurationMs }) }, [ftb, send, transitionDurationMs])
   const handleSetOvl = useCallback((alpha: number) => { send({ type: 'SET_OVL', alpha }) }, [send])
@@ -549,11 +541,53 @@ export function ControllerPage() {
     send({ type: 'SET_PIP', pip, bg: config.bg, zones: config.zones })
   }, [send])
 
+  // Sources sorted by mixerInput — index 0 = key '1', index 1 = key '2', etc.
+  const sortedSources = [...(activeProduction?.sources ?? [])].sort((a, b) =>
+    a.mixerInput.localeCompare(b.mixerInput),
+  )
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-    if (e.code === 'Space') { e.preventDefault(); handleCut() }
-    if (e.code === 'Enter') { e.preventDefault(); handleAuto() }
-  }, [handleCut, handleAuto])
+    if (e.code === 'Space') { e.preventDefault(); handleCut(); return }
+    if (e.code === 'Enter') { e.preventDefault(); handleAuto(); return }
+    if (e.code === 'KeyF')  { e.preventDefault(); handleFtb(); return }
+    // K — toggle DSK layer 0
+    if (e.code === 'KeyK') {
+      e.preventDefault()
+      const next = !(dskState[0] ?? false)
+      send({ type: 'DSK_TOGGLE', layer: 0, visible: next })
+      return
+    }
+    // 1–9: select preview source or PiP (PiPs follow sources in numbering)
+    // Shift+1–9: hot-cut to program
+    const digit = e.code.startsWith('Digit') ? parseInt(e.code.slice(5), 10) : NaN
+    if (!isNaN(digit) && digit >= 1 && digit <= 9) {
+      e.preventDefault()
+      const idx = digit - 1
+      if (idx < sortedSources.length) {
+        const source = sortedSources[idx]!
+        const isOnPgm = pgmInput === source.mixerInput && pgmPip === null
+        if (isOnPgm) return
+        if (e.shiftKey) {
+          cut()
+          send({ type: 'CUT', mixerInput: source.mixerInput, afvRampUpMs, afvRampDownMs })
+        } else {
+          handleSelectPvw(source.mixerInput)
+        }
+      } else {
+        const pipIdx = idx - sortedSources.length
+        if (pipIdx < pips.length) {
+          const isOnPgm = pgmPip === pipIdx
+          if (isOnPgm) return
+          if (e.shiftKey) {
+            send({ type: 'TAKE', pip: pipIdx, afvRampUpMs, afvRampDownMs })
+          } else {
+            handleSelectPvwPip(pipIdx)
+          }
+        }
+      }
+    }
+  }, [handleCut, handleAuto, handleFtb, dskState, send, sortedSources, cut, setPvw, pgmInput, pgmPip, afvRampUpMs, afvRampDownMs, pips, handleSelectPvw, handleSelectPvwPip])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -604,8 +638,8 @@ export function ControllerPage() {
     { key: 'multiviewer', Icon: MultiviewerIcon },
     { key: 'pgm',         Icon: MonitorIcon     },
     { key: 'controller',  Icon: ControllerIcon  },
-    { key: 'audio',       Icon: AudioIcon        },
     { key: 'pip',         Icon: PipIcon          },
+    { key: 'audio',       Icon: AudioIcon        },
   ] as const
 
   const showBottomRow = panels.controller || panels.audio || panels.pip
@@ -862,36 +896,51 @@ export function ControllerPage() {
     <Modal open={audioOptionsOpen} title="Audio Options" onClose={() => setAudioOptionsOpen(false)} className="max-w-xs">
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <label className="text-xs text-[--color-text-muted] shrink-0">Ramp Time</label>
+          <label className="text-xs text-[--color-text-muted] w-20 shrink-0">Ramp Up</label>
           <input
             type="number"
             min={0}
             max={5000}
             step={50}
-            value={rampMsText}
+            value={rampUpMsText}
             onChange={(e) => {
-              setRampMsText(e.target.value)
-              const parsed = parseInt(e.target.value, 10)
-              if (!isNaN(parsed) && parsed >= 0 && parsed <= 5000) {
-                const next = { ...audioOptions, rampMs: parsed }
-                setAudioOptions(next)
-                try { localStorage.setItem(AUDIO_OPTIONS_KEY, JSON.stringify(next)) } catch {}
-              }
+              setRampUpMsText(e.target.value)
             }}
             onBlur={() => {
-              const parsed = parseInt(rampMsText, 10)
-              const clamped = isNaN(parsed) ? 200 : Math.max(0, Math.min(5000, parsed))
-              setRampMsText(String(clamped))
-              const next = { ...audioOptions, rampMs: clamped }
-              setAudioOptions(next)
-              try { localStorage.setItem(AUDIO_OPTIONS_KEY, JSON.stringify(next)) } catch {}
+              const parsed = parseInt(rampUpMsText, 10)
+              const clamped = isNaN(parsed) ? afvRampUpMs : Math.max(0, Math.min(5000, parsed))
+              setRampUpMsText(String(clamped))
+              const down = parseInt(rampDownMsText, 10)
+              send({ type: 'AFV_RAMP_SET', rampUpMs: clamped, rampDownMs: isNaN(down) ? afvRampDownMs : Math.max(0, Math.min(5000, down)) })
             }}
             className="bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[--color-accent] w-20"
           />
           <span className="text-xs text-[--color-text-muted] shrink-0">ms</span>
-          <Tooltip title="Ramp Time" content={
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-[--color-text-muted] w-20 shrink-0">Ramp Down</label>
+          <input
+            type="number"
+            min={0}
+            max={5000}
+            step={50}
+            value={rampDownMsText}
+            onChange={(e) => {
+              setRampDownMsText(e.target.value)
+            }}
+            onBlur={() => {
+              const parsed = parseInt(rampDownMsText, 10)
+              const clamped = isNaN(parsed) ? afvRampDownMs : Math.max(0, Math.min(5000, parsed))
+              setRampDownMsText(String(clamped))
+              const up = parseInt(rampUpMsText, 10)
+              send({ type: 'AFV_RAMP_SET', rampUpMs: isNaN(up) ? afvRampUpMs : Math.max(0, Math.min(5000, up)), rampDownMs: clamped })
+            }}
+            className="bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[--color-accent] w-20"
+          />
+          <span className="text-xs text-[--color-text-muted] shrink-0">ms</span>
+          <Tooltip title="AFV Ramp" content={
             <span className="text-[11px] text-zinc-300 max-w-[200px] leading-relaxed">
-              Crossfade ramp applied when audio follows a CUT or transition (default 200 ms). ON/OFF uses Strom's built-in anti-click ramp (~20 ms).
+              Ramp Up: fade-in time when a channel is brought on-air. Ramp Down: fade-out time when a channel is taken off-air. Applied when audio follows a CUT or transition (default 200 ms each).
             </span>
           }>
             <span className="flex items-center justify-center w-4 h-4 rounded-full border border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-400 transition-colors cursor-default text-[10px] font-bold leading-none shrink-0">i</span>

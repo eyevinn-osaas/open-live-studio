@@ -167,7 +167,6 @@ function PaneBar({ children }: { children: React.ReactNode }) {
 
 // ─── Persisted options keys (mirrors ControllerPage) ─────────────────────────
 
-const AUDIO_OPTIONS_KEY      = 'ol-studio-audio-options'
 const CONTROLLER_OPTIONS_KEY = 'ol-studio-controller-options'
 
 const ALL_TRANSITIONS = ['fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down'] as const
@@ -243,7 +242,7 @@ export function PanePage() {
     return () => clearInterval(id)
   }, [fetchSources, fetchProductions])
 
-  const { cut, auto, ftb, setPvw, pvwInput, transitionType, transitionDurationMs, setActiveProduction } = useProductionStore()
+  const { cut, auto, ftb, setPvw, pvwInput, transitionType, transitionDurationMs, setActiveProduction, afvRampUpMs, afvRampDownMs } = useProductionStore()
   const activeProduction   = useProductionsStore((s) => s.productions.find((p) => p.id === productionId))
   const whepEndpoint       = useProductionsStore((s) => s.productions.find((p) => p.id === productionId)?.whepEndpoint)
   const pgmWhepEndpoint    = useProductionsStore((s) => s.productions.find((p) => p.id === productionId)?.pgmWhepEndpoint)
@@ -280,13 +279,16 @@ export function PanePage() {
     else void paneRef.current?.requestFullscreen()
   }, [])
 
-  // Audio options (mirrors ControllerPage)
+  // Audio options
   const [audioOptionsOpen, setAudioOptionsOpen] = useState(false)
-  const [rampMs, setRampMs] = useState<number>(() => {
-    try { return (JSON.parse(localStorage.getItem(AUDIO_OPTIONS_KEY) ?? '{}') as { rampMs?: number }).rampMs ?? 200 } catch { return 200 }
-  })
-  const [rampMsText, setRampMsText] = useState(() => String(rampMs))
-  useEffect(() => { if (audioOptionsOpen) setRampMsText(String(rampMs)) }, [audioOptionsOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [rampUpMsText, setRampUpMsText] = useState(() => String(afvRampUpMs))
+  const [rampDownMsText, setRampDownMsText] = useState(() => String(afvRampDownMs))
+  useEffect(() => {
+    if (audioOptionsOpen) {
+      setRampUpMsText(String(afvRampUpMs))
+      setRampDownMsText(String(afvRampDownMs))
+    }
+  }, [audioOptionsOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Controller options (mirrors ControllerPage)
   const [controllerOptionsOpen, setControllerOptionsOpen] = useState(false)
@@ -326,8 +328,8 @@ export function PanePage() {
     return () => { cancelled = true }
   }, [productionId, activeProduction?.status, setElements])
 
-  const handleCut       = useCallback(() => { cut(); send({ type: 'CUT', mixerInput: pvwInput ?? '' }) }, [cut, send, pvwInput])
-  const handleAuto      = useCallback(() => { auto(); send({ type: 'TRANSITION', mixerInput: pvwInput ?? '', transitionType, durationMs: transitionDurationMs }) }, [auto, send, pvwInput, transitionType, transitionDurationMs])
+  const handleCut       = useCallback(() => { cut(); send({ type: 'CUT', mixerInput: pvwInput ?? '', afvRampUpMs, afvRampDownMs }) }, [cut, send, pvwInput, afvRampUpMs, afvRampDownMs])
+  const handleAuto      = useCallback(() => { auto(); send({ type: 'TRANSITION', mixerInput: pvwInput ?? '', transitionType, durationMs: transitionDurationMs, afvRampUpMs, afvRampDownMs }) }, [auto, send, pvwInput, transitionType, transitionDurationMs, afvRampUpMs, afvRampDownMs])
   const handleFtb       = useCallback(() => { ftb(); send({ type: 'FTB', durationMs: transitionDurationMs }) }, [ftb, send, transitionDurationMs])
   const handleSetOvl    = useCallback((alpha: number) => { send({ type: 'SET_OVL', alpha }) }, [send])
   const handleSelectPvw = useCallback((mixerInput: string) => { setPvw(mixerInput); send({ type: 'SET_PVW', mixerInput }) }, [setPvw, send])
@@ -469,21 +471,34 @@ export function PanePage() {
     <Modal open={audioOptionsOpen} title="Audio Options" onClose={() => setAudioOptionsOpen(false)} className="max-w-xs">
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <label className="text-xs text-[--color-text-muted] shrink-0">Ramp Time</label>
-          <input type="number" min={0} max={5000} step={50} value={rampMsText}
+          <label className="text-xs text-[--color-text-muted] w-20 shrink-0">Ramp Up</label>
+          <input type="number" min={0} max={5000} step={50} value={rampUpMsText}
             onChange={(e) => {
-              setRampMsText(e.target.value)
-              const parsed = parseInt(e.target.value, 10)
-              if (!isNaN(parsed) && parsed >= 0 && parsed <= 5000) {
-                setRampMs(parsed)
-                try { localStorage.setItem(AUDIO_OPTIONS_KEY, JSON.stringify({ rampMs: parsed })) } catch {}
-              }
+              setRampUpMsText(e.target.value)
             }}
             onBlur={() => {
-              const parsed = parseInt(rampMsText, 10)
-              const clamped = isNaN(parsed) ? 200 : Math.max(0, Math.min(5000, parsed))
-              setRampMsText(String(clamped)); setRampMs(clamped)
-              try { localStorage.setItem(AUDIO_OPTIONS_KEY, JSON.stringify({ rampMs: clamped })) } catch {}
+              const parsed = parseInt(rampUpMsText, 10)
+              const clamped = isNaN(parsed) ? afvRampUpMs : Math.max(0, Math.min(5000, parsed))
+              setRampUpMsText(String(clamped))
+              const down = parseInt(rampDownMsText, 10)
+              send({ type: 'AFV_RAMP_SET', rampUpMs: clamped, rampDownMs: isNaN(down) ? afvRampDownMs : Math.max(0, Math.min(5000, down)) })
+            }}
+            className="bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[--color-accent] w-20"
+          />
+          <span className="text-xs text-[--color-text-muted] shrink-0">ms</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-[--color-text-muted] w-20 shrink-0">Ramp Down</label>
+          <input type="number" min={0} max={5000} step={50} value={rampDownMsText}
+            onChange={(e) => {
+              setRampDownMsText(e.target.value)
+            }}
+            onBlur={() => {
+              const parsed = parseInt(rampDownMsText, 10)
+              const clamped = isNaN(parsed) ? afvRampDownMs : Math.max(0, Math.min(5000, parsed))
+              setRampDownMsText(String(clamped))
+              const up = parseInt(rampUpMsText, 10)
+              send({ type: 'AFV_RAMP_SET', rampUpMs: isNaN(up) ? afvRampUpMs : Math.max(0, Math.min(5000, up)), rampDownMs: clamped })
             }}
             className="bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[--color-accent] w-20"
           />

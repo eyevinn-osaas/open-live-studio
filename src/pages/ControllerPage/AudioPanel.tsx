@@ -1056,6 +1056,38 @@ function MonitorMasterStrip({ send }: { send: SendFn }) {
   )
 }
 
+// ── Section collapse persistence ─────────────────────────────────────────────
+
+const SECTIONS_KEY = 'ol-audio-panel-sections'
+
+type SectionState = {
+  main: { out: boolean; groups: boolean; in: boolean }
+  aux:  { out: boolean; in: boolean }
+}
+
+const DEFAULT_SECTIONS: SectionState = {
+  main: { out: false, groups: false, in: false },
+  aux:  { out: false, in: false },
+}
+
+function loadSections(): SectionState {
+  try {
+    const raw = localStorage.getItem(SECTIONS_KEY)
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<SectionState>
+      return {
+        main: { ...DEFAULT_SECTIONS.main, ...(p.main ?? {}) },
+        aux:  { ...DEFAULT_SECTIONS.aux,  ...(p.aux  ?? {}) },
+      }
+    }
+  } catch {}
+  return DEFAULT_SECTIONS
+}
+
+function saveSections(s: SectionState) {
+  try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(s)) } catch {}
+}
+
 // ── Section bar ───────────────────────────────────────────────────────────────
 // Vertical label bar used in the MAIN tab for collapsible sections.
 // Click to collapse/expand. Arrow indicator shows state.
@@ -1115,12 +1147,19 @@ export function AudioPanel({ send, numAuxBuses = 2, numGroups = 2, showEbuMain =
   const grpBuses = Array.from({ length: numGroups }, (_, i) => i + 1)
 
   const [activeTab, setActiveTab] = useState<AudioTab>('main')
-  // MAIN tab — per-section collapsed state; all expanded by default
-  const [collapsed, setCollapsed] = useState({ out: false, groups: false, in: false })
-  const toggleSection = (k: keyof typeof collapsed) => setCollapsed((c) => ({ ...c, [k]: !c[k] }))
-  // AUX tabs — shared collapsed state for OUT/IN sections
-  const [auxCollapsed, setAuxCollapsed] = useState({ out: false, in: false })
-  const toggleAuxSection = (k: keyof typeof auxCollapsed) => setAuxCollapsed((c) => ({ ...c, [k]: !c[k] }))
+  const [sections, setSections] = useState<SectionState>(loadSections)
+  const collapsed = sections.main
+  const auxCollapsed = sections.aux
+  const toggleSection = (k: keyof SectionState['main']) => setSections((s) => {
+    const next = { ...s, main: { ...s.main, [k]: !s.main[k] } }
+    saveSections(next)
+    return next
+  })
+  const toggleAuxSection = (k: keyof SectionState['aux']) => setSections((s) => {
+    const next = { ...s, aux: { ...s.aux, [k]: !s.aux[k] } }
+    saveSections(next)
+    return next
+  })
 
   const mainElement   = elements.find((e) => e.elementId === 'main')
   const inputElements = elements.filter((e) => e.elementId !== 'main' && e.mixerInput !== null)
