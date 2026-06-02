@@ -2,67 +2,45 @@ import { useState, useEffect } from 'react'
 import { productionConfigsApi } from '@/lib/api'
 import type { ProductionConfig } from '@/lib/api'
 import { PRODUCTION_PROPERTIES } from '@/lib/production-schema'
+import { ConfigFieldGroup, inputCls } from '@/components/ui/ProductionConfigFields'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 
-const selectCls =
-  'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30 appearance-none cursor-pointer'
+const tProps = PRODUCTION_PROPERTIES
 
-const inputCls =
-  'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30'
+function defaultValues(): Record<string, string | number | boolean> {
+  return Object.fromEntries(tProps.map((p) => [p.id, p.default]))
+}
+
+function cfgOnChange(
+  values: Record<string, string | number | boolean>,
+  setValues: React.Dispatch<React.SetStateAction<Record<string, string | number | boolean>>>,
+) {
+  return (id: string, v: string | number | boolean) => setValues((prev) => ({ ...prev, [id]: v }))
+}
 
 // ---------------------------------------------------------------------------
-// Shared property fields
+// Two-column config layout — identical to the production modal config side
 // ---------------------------------------------------------------------------
 
-function ConfigFields({
+function ConfigLayout({
   values,
   onChange,
 }: {
   values: Record<string, string | number | boolean>
-  onChange: (values: Record<string, string | number | boolean>) => void
+  onChange: (id: string, v: string | number | boolean) => void
 }) {
   return (
-    <div className="flex flex-col gap-3 border-t border-[--color-border] pt-3">
-      <span className="text-xs uppercase tracking-wider text-[--color-text-muted]">Values</span>
-      {PRODUCTION_PROPERTIES.map((prop) => (
-        <div key={prop.id}>
-          <label className="text-xs text-[--color-text-muted] block mb-1">{prop.label}</label>
-          {prop.type === 'boolean' ? (
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={Boolean(values[prop.id] ?? prop.default)}
-                onChange={(e) => onChange({ ...values, [prop.id]: e.target.checked })}
-                className="accent-orange-500"
-              />
-              <span className="text-xs text-[--color-text-muted]">Enable</span>
-            </label>
-          ) : prop.type === 'select' ? (
-            <select
-              value={String(values[prop.id] ?? prop.default)}
-              onChange={(e) => onChange({ ...values, [prop.id]: e.target.value })}
-              className={selectCls}
-            >
-              {prop.options?.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                value={values[prop.id] as number ?? prop.default as number}
-                min={prop.min}
-                max={prop.max}
-                onChange={(e) => onChange({ ...values, [prop.id]: e.target.valueAsNumber })}
-                className={inputCls}
-              />
-              {prop.unit && <span className="text-xs text-[--color-text-muted] shrink-0">{prop.unit}</span>}
-            </div>
-          )}
-        </div>
-      ))}
+    <div className="grid grid-cols-2 gap-x-12 gap-y-4">
+      <div className="flex flex-col gap-4">
+        <ConfigFieldGroup label="Strom"       ids={['mix_latency', 'clock']}                          properties={tProps} values={values} onChange={onChange} />
+        <ConfigFieldGroup label="PGM"         ids={['pgm_resolution', 'pgm_framerate', 'bitrate']}    properties={tProps} values={values} onChange={onChange} />
+      </div>
+      <div className="flex flex-col gap-4">
+        <ConfigFieldGroup label="Multiviewer" ids={['multiview_resolution', 'multiview_framerate', 'multiview_bitrate']} properties={tProps} values={values} onChange={onChange} />
+        <ConfigFieldGroup label="Audio"       ids={['num_aux_buses', 'num_groups', 'ebu_main']}       properties={tProps} values={values} onChange={onChange} />
+        <ConfigFieldGroup label="Picture in Picture" ids={['num_pips']}                               properties={tProps} values={values} onChange={onChange} />
+      </div>
     </div>
   )
 }
@@ -73,9 +51,7 @@ function ConfigFields({
 
 function CreateConfigModal({ onSave, onClose }: { onSave: (cfg: ProductionConfig) => void; onClose: () => void }) {
   const [name, setName] = useState('')
-  const [values, setValues] = useState<Record<string, string | number | boolean>>(() =>
-    Object.fromEntries(PRODUCTION_PROPERTIES.map((p) => [p.id, p.default]))
-  )
+  const [values, setValues] = useState(defaultValues)
   const [saving, setSaving] = useState(false)
 
   async function handleCreate() {
@@ -90,10 +66,10 @@ function CreateConfigModal({ onSave, onClose }: { onSave: (cfg: ProductionConfig
   }
 
   return (
-    <Modal open title="New Config" onClose={onClose} className="max-w-md">
-      <div className="flex flex-col gap-4">
+    <Modal open title="New Config" onClose={onClose} className="max-w-3xl">
+      <div className="flex flex-col gap-6">
         <div>
-          <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Name</label>
+          <label className="text-xs text-orange-500 uppercase tracking-wider block mb-1">Name</label>
           <input
             type="text"
             value={name}
@@ -104,7 +80,7 @@ function CreateConfigModal({ onSave, onClose }: { onSave: (cfg: ProductionConfig
             className={inputCls}
           />
         </div>
-        <ConfigFields values={values} onChange={setValues} />
+        <ConfigLayout values={values} onChange={cfgOnChange(values, setValues)} />
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button variant="active" onClick={() => void handleCreate()} disabled={!name.trim() || saving}>
@@ -122,7 +98,7 @@ function CreateConfigModal({ onSave, onClose }: { onSave: (cfg: ProductionConfig
 
 function EditConfigModal({ config, onSave, onClose }: { config: ProductionConfig; onSave: (updated: ProductionConfig) => void; onClose: () => void }) {
   const [name, setName] = useState(config.name)
-  const [values, setValues] = useState<Record<string, string | number | boolean>>({ ...config.values })
+  const [values, setValues] = useState<Record<string, string | number | boolean>>(() => ({ ...config.values }))
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
@@ -137,10 +113,10 @@ function EditConfigModal({ config, onSave, onClose }: { config: ProductionConfig
   }
 
   return (
-    <Modal open title={`Edit Config — ${config.name}`} onClose={onClose} className="max-w-md">
-      <div className="flex flex-col gap-4">
+    <Modal open title={`Edit Config — ${config.name}`} onClose={onClose} className="max-w-3xl">
+      <div className="flex flex-col gap-6">
         <div>
-          <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Name</label>
+          <label className="text-xs text-orange-500 uppercase tracking-wider block mb-1">Name</label>
           <input
             type="text"
             value={name}
@@ -150,7 +126,7 @@ function EditConfigModal({ config, onSave, onClose }: { config: ProductionConfig
             className={inputCls}
           />
         </div>
-        <ConfigFields values={values} onChange={setValues} />
+        <ConfigLayout values={values} onChange={cfgOnChange(values, setValues)} />
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button variant="active" onClick={() => void handleSave()} disabled={!name.trim() || saving}>
