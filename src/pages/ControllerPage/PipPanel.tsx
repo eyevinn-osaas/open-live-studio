@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useProductionStore, type PipConfig, type PipZone, type SourceCrop, type PipTransforms } from '@/store/production.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { useSourcesStore } from '@/store/sources.store'
@@ -54,6 +54,53 @@ function isCropZero(c: SourceCrop): boolean {
   return c.left < 1e-4 && c.top < 1e-4 && c.right < 1e-4 && c.bottom < 1e-4
 }
 
+// Assumed source resolution (used for X/Y/W/H pixel display and canvas math).
+// When Strom provides real input_resolutions we can pass them in.
+const CROP_SRC_W = 1920
+const CROP_SRC_H = 1080
+const CROP_CANVAS_W = 280
+const CROP_CANVAS_H = Math.round(CROP_CANVAS_W * CROP_SRC_H / CROP_SRC_W) // 157
+
+type CropRect = { x: number; y: number; w: number; h: number } // in source pixels
+type CropDrag =
+  | { kind: 'move';   startRect: CropRect; startMx: number; startMy: number }
+  | { kind: 'resize'; handle: string; startRect: CropRect; startMx: number; startMy: number; lockedAspect: number | null }
+
+/** Convert SourceCrop fractions → pixel rect (visible window in source pixels). */
+function cropToRect(c: SourceCrop): CropRect {
+  const x = Math.round(c.left * CROP_SRC_W)
+  const y = Math.round(c.top * CROP_SRC_H)
+  const w = Math.round((1 - c.left - c.right) * CROP_SRC_W)
+  const h = Math.round((1 - c.top - c.bottom) * CROP_SRC_H)
+  return { x, y, w: Math.max(1, w), h: Math.max(1, h) }
+}
+
+/** Convert pixel rect → SourceCrop fractions, clamped to valid range. */
+function rectToCrop(r: CropRect): SourceCrop {
+  const w = Math.max(1, Math.min(r.w, CROP_SRC_W))
+  const h = Math.max(1, Math.min(r.h, CROP_SRC_H))
+  const x = Math.max(0, Math.min(r.x, CROP_SRC_W - w))
+  const y = Math.max(0, Math.min(r.y, CROP_SRC_H - h))
+  return {
+    left:   x / CROP_SRC_W,
+    top:    y / CROP_SRC_H,
+    right:  (CROP_SRC_W - x - w) / CROP_SRC_W,
+    bottom: (CROP_SRC_H - y - h) / CROP_SRC_H,
+  }
+}
+
+const CROP_HANDLES = ['n','ne','e','se','s','sw','w','nw'] as const
+const CROP_HANDLE_STYLE: Record<string, React.CSSProperties> = {
+  n:  { top: -4, left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' },
+  ne: { top: -4, right: -4,   cursor: 'ne-resize' },
+  e:  { top: '50%', transform: 'translateY(-50%)', right: -4, cursor: 'e-resize' },
+  se: { bottom: -4, right: -4, cursor: 'se-resize' },
+  s:  { bottom: -4, left: '50%', transform: 'translateX(-50%)', cursor: 's-resize' },
+  sw: { bottom: -4, left: -4,  cursor: 'sw-resize' },
+  w:  { top: '50%', transform: 'translateY(-50%)', left: -4, cursor: 'w-resize' },
+  nw: { top: -4,    left: -4,  cursor: 'nw-resize' },
+}
+
 function CropEditor({
   inputIdx,
   transforms,
@@ -64,73 +111,240 @@ function CropEditor({
   onChange: (transforms: PipTransforms) => void
 }) {
   const crop = transforms[inputIdx] ?? EMPTY_CROP
+  const rect = useMemo(() => cropToRect(crop), [crop])
 
-  const setCropField = (field: keyof SourceCrop, value: number) => {
-    const next: SourceCrop = { ...crop, [field]: value }
-    // Ensure at least 1% visible on each axis
-    const maxL = Math.max(0, 1 - next.right - 0.01)
-    const maxR = Math.max(0, 1 - next.left - 0.01)
-    const maxT = Math.max(0, 1 - next.bottom - 0.01)
-    const maxB = Math.max(0, 1 - next.top - 0.01)
-    onChange({ ...transforms, [inputIdx]: {
-      left:   clamp(next.left,   0, maxL),
-      right:  clamp(next.right,  0, maxR),
-      top:    clamp(next.top,    0, maxT),
-      bottom: clamp(next.bottom, 0, maxB),
-    }})
-  }
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const dragRef   = useRef<CropDrag | null>(null)
+  const [aspectLocked, setAspectLocked] = useState(false)
+  const aspectLockRef = useRef(false)
+  useEffect(() => { aspectLockRef.current = aspectLocked }, [aspectLocked])
+
+  // Local string state for the X/Y/W/H inputs while editing
+  const [pxEdit, setPxEdit] = useState<Partial<Record<'x'|'y'|'w'|'h', string>>>({})
+
+  const commit = useCallback((r: CropRect) => {
+    const next = rectToCrop(r)
+    // If result is essentially full-frame, delete the entry (= no crop)
+    if (isCropZero(next)) {
+      const t = { ...transforms }; delete t[inputIdx]; onChange(t)
+    } else {
+      onChange({ ...transforms, [inputIdx]: next })
+    }
+  }, [transforms, inputIdx, onChange])
+
+  // Canvas scale: source pixels → display pixels
+  const scaleX = CROP_CANVAS_W / CROP_SRC_W
+  const scaleY = CROP_CANVAS_H / CROP_SRC_H
+
+  // Crop box position in canvas display pixels
+  const boxL = rect.x * scaleX
+  const boxT = rect.y * scaleY
+  const boxW = rect.w * scaleX
+  const boxH = rect.h * scaleY
+
+  const startDrag = useCallback((e: React.MouseEvent, kind: 'move' | 'resize', handle = '') => {
+    e.stopPropagation(); e.preventDefault()
+    dragRef.current = {
+      kind: kind === 'resize' ? 'resize' : 'move',
+      handle,
+      startRect: { ...rect },
+      startMx: e.clientX,
+      startMy: e.clientY,
+      lockedAspect: aspectLockRef.current ? rect.w / rect.h : null,
+    } as CropDrag
+  }, [rect])
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const drag = dragRef.current
+      const canvas = canvasRef.current
+      if (!drag || !canvas) return
+      const dx = (e.clientX - drag.startMx) / scaleX
+      const dy = (e.clientY - drag.startMy) / scaleY
+      const r = { ...drag.startRect }
+      const locked = drag.kind === 'resize' ? drag.lockedAspect : null
+
+      if (drag.kind === 'move') {
+        r.x = Math.round(clamp(r.x + dx, 0, CROP_SRC_W - r.w))
+        r.y = Math.round(clamp(r.y + dy, 0, CROP_SRC_H - r.h))
+      } else {
+        const h = drag.handle
+        if (h.includes('e')) {
+          r.w = Math.round(clamp(r.w + dx, 10, CROP_SRC_W - r.x))
+          if (locked) r.h = Math.round(clamp(r.w / locked, 10, CROP_SRC_H - r.y))
+        }
+        if (h.includes('s')) {
+          r.h = Math.round(clamp(r.h + dy, 10, CROP_SRC_H - r.y))
+          if (locked) r.w = Math.round(clamp(r.h * locked, 10, CROP_SRC_W - r.x))
+        }
+        if (h.includes('w')) {
+          const newX = Math.round(clamp(r.x + dx, 0, r.x + r.w - 10))
+          r.w = r.x + r.w - newX; r.x = newX
+          if (locked) r.h = Math.round(clamp(r.w / locked, 10, CROP_SRC_H - r.y))
+        }
+        if (h.includes('n')) {
+          const newY = Math.round(clamp(r.y + dy, 0, r.y + r.h - 10))
+          r.h = r.y + r.h - newY; r.y = newY
+          if (locked) r.w = Math.round(clamp(r.h * locked, 10, CROP_SRC_W - r.x))
+        }
+      }
+      commit(r)
+    }
+    const onUp = () => { dragRef.current = null }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+  }, [commit, scaleX, scaleY])
 
   const resetCrop = () => {
-    const next = { ...transforms }
-    delete next[inputIdx]
-    onChange(next)
+    const t = { ...transforms }; delete t[inputIdx]; onChange(t)
   }
 
-  const fields: Array<{ key: keyof SourceCrop; label: string }> = [
-    { key: 'left', label: 'L' },
-    { key: 'top', label: 'T' },
-    { key: 'right', label: 'R' },
-    { key: 'bottom', label: 'B' },
-  ]
+  // Zoom: width fraction of source (1 = no zoom, lower = zoomed in)
+  const zoomFrac = clamp(1 - crop.left - crop.right, 0.05, 1)
+  const handleZoom = (newZoomFrac: number) => {
+    const curW = 1 - crop.left - crop.right
+    const curH = 1 - crop.top - crop.bottom
+    const scale = newZoomFrac / curW
+    const newW = newZoomFrac
+    const newH = aspectLocked ? newW * (curH / curW) : clamp(curH * scale, 0.05, 1)
+    const cx = crop.left + curW / 2
+    const cy = crop.top + curH / 2
+    const newL = clamp(cx - newW / 2, 0, 1 - newW)
+    const newT = clamp(cy - newH / 2, 0, 1 - newH)
+    commit({
+      x: Math.round(newL * CROP_SRC_W),
+      y: Math.round(newT * CROP_SRC_H),
+      w: Math.round(newW * CROP_SRC_W),
+      h: Math.round(newH * CROP_SRC_H),
+    })
+  }
+
+  // X/Y/W/H pixel inputs
+  const commitField = (field: 'x'|'y'|'w'|'h', raw: string) => {
+    const v = parseInt(raw, 10)
+    if (!Number.isFinite(v)) return
+    const r = { ...rect, [field]: v }
+    if (field === 'w' && aspectLocked) r.h = Math.round(v / (rect.w / rect.h))
+    if (field === 'h' && aspectLocked) r.w = Math.round(v * (rect.w / rect.h))
+    commit(r)
+  }
+
+  const fieldVal = (f: 'x'|'y'|'w'|'h') => pxEdit[f] ?? String(rect[f])
 
   return (
-    <div className="flex flex-col gap-1.5 px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded-sm">
+    <div className="flex flex-col gap-2 p-2 bg-zinc-900 border border-zinc-700">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Crop / Zoom</span>
-        {!isCropZero(crop) && (
-          <button
-            onClick={resetCrop}
-            className="text-[9px] text-zinc-500 hover:text-orange-400 border border-zinc-700 hover:border-zinc-500 px-1 py-0.5 leading-none"
-          >
-            Reset
-          </button>
-        )}
+        <button
+          onClick={resetCrop}
+          className="text-[9px] px-1.5 py-0.5 border border-zinc-700 text-zinc-500 hover:text-orange-400 hover:border-zinc-500 leading-none"
+        >
+          Reset
+        </button>
       </div>
-      {isCropZero(crop) ? (
-        <span className="text-[9px] text-zinc-600 italic">No crop</span>
-      ) : (
-        <span className="text-[9px] text-zinc-400 font-mono">
-          {fields.map(({ key, label }) => `${label} ${Math.round(crop[key] * 100)}%`).join('  ')}
-        </span>
-      )}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        {fields.map(({ key, label }) => (
-          <label key={key} className="flex items-center gap-1.5">
-            <span className="text-[9px] text-zinc-500 w-3 shrink-0">{label}</span>
-            <input
-              type="range"
-              min={0}
-              max={0.5}
-              step={0.01}
-              value={crop[key]}
-              onChange={(e) => setCropField(key, parseFloat(e.target.value))}
-              className="flex-1 h-1 accent-orange-500 cursor-pointer"
+
+      {/* Canvas */}
+      <div
+        ref={canvasRef}
+        className="relative select-none overflow-hidden shrink-0"
+        style={{ width: CROP_CANVAS_W, height: CROP_CANVAS_H, background: '#0a0a0a', border: '1px solid #3f3f46' }}
+      >
+        {/* Masked (cropped-out) overlay — four rects */}
+        {/* left */}
+        <div style={{ position:'absolute', top:0, left:0, width: boxL, bottom:0, background:'rgba(0,0,0,0.55)', pointerEvents:'none' }} />
+        {/* right */}
+        <div style={{ position:'absolute', top:0, right:0, width: CROP_CANVAS_W - boxL - boxW, bottom:0, background:'rgba(0,0,0,0.55)', pointerEvents:'none' }} />
+        {/* top */}
+        <div style={{ position:'absolute', top:0, left: boxL, width: boxW, height: boxT, background:'rgba(0,0,0,0.55)', pointerEvents:'none' }} />
+        {/* bottom */}
+        <div style={{ position:'absolute', bottom:0, left: boxL, width: boxW, height: CROP_CANVAS_H - boxT - boxH, background:'rgba(0,0,0,0.55)', pointerEvents:'none' }} />
+
+        {/* Crop box */}
+        <div
+          style={{
+            position: 'absolute',
+            left: boxL, top: boxT, width: boxW, height: boxH,
+            border: '1.5px solid #f97316',
+            boxSizing: 'border-box',
+            cursor: 'move',
+          }}
+          onMouseDown={(e) => startDrag(e, 'move')}
+        >
+          {/* Resize handles */}
+          {CROP_HANDLES.map((h) => (
+            <div
+              key={h}
+              style={{
+                position: 'absolute',
+                width: 7, height: 7,
+                background: '#f97316',
+                border: '1px solid rgba(0,0,0,0.6)',
+                ...CROP_HANDLE_STYLE[h],
+              }}
+              onMouseDown={(e) => startDrag(e, 'resize', h)}
             />
-            <span className="text-[9px] text-zinc-400 font-mono w-8 text-right shrink-0">
-              {Math.round(crop[key] * 100)}%
-            </span>
+          ))}
+        </div>
+
+        {/* Size label inside box */}
+        <div style={{
+          position:'absolute', left: boxL + 2, top: boxT + 2,
+          fontSize: 8, color: '#f97316', background:'rgba(0,0,0,0.6)', padding:'1px 3px', pointerEvents:'none',
+          display: boxW < 50 || boxH < 16 ? 'none' : 'block',
+        }}>
+          {rect.w}×{rect.h}
+        </div>
+      </div>
+
+      {/* Zoom slider */}
+      <label className="flex items-center gap-2">
+        <span className="text-[9px] text-zinc-500 w-8 shrink-0">Zoom</span>
+        <input
+          type="range"
+          min={0.05}
+          max={1}
+          step={0.01}
+          value={zoomFrac}
+          onChange={(e) => handleZoom(parseFloat(e.target.value))}
+          className="flex-1 h-1 accent-orange-500 cursor-pointer"
+          style={{ direction: 'rtl' }} // left = zoomed in, right = zoomed out
+        />
+        <span className="text-[9px] text-zinc-400 font-mono w-8 text-right shrink-0">
+          {zoomFrac < 0.999 ? `${Math.round(1 / zoomFrac * 10) / 10}×` : '1×'}
+        </span>
+      </label>
+
+      {/* X Y W H inputs */}
+      <div className="flex items-end gap-1">
+        {(['x','y','w','h'] as const).map((f) => (
+          <label key={f} className="flex flex-col items-center gap-0.5 flex-1">
+            <span className="text-[8px] text-zinc-500 uppercase">{f}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={fieldVal(f)}
+              onFocus={() => setPxEdit((p) => ({ ...p, [f]: String(rect[f]) }))}
+              onChange={(e) => setPxEdit((p) => ({ ...p, [f]: e.target.value }))}
+              onBlur={(e) => { commitField(f, e.target.value); setPxEdit((p) => { const n={...p}; delete n[f]; return n }) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { commitField(f, (e.target as HTMLInputElement).value); setPxEdit((p) => { const n={...p}; delete n[f]; return n }) }}}
+              className="w-full bg-zinc-950 border border-zinc-700 text-zinc-200 text-[10px] text-center px-0.5 py-0.5 focus:outline-none focus:border-zinc-500"
+            />
           </label>
         ))}
+        {/* Aspect lock */}
+        <label className="flex flex-col items-center gap-0.5 shrink-0 cursor-pointer select-none">
+          <span className="text-[8px] text-zinc-500 uppercase">Lock</span>
+          <input
+            type="checkbox"
+            checked={aspectLocked}
+            onChange={(e) => {
+              setAspectLocked(e.target.checked)
+            }}
+            className="w-[18px] h-[18px] accent-orange-500 cursor-pointer"
+          />
+        </label>
       </div>
     </div>
   )
