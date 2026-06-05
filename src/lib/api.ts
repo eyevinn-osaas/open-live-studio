@@ -2,6 +2,9 @@ export { BASE } from './base.js'
 import { BASE } from './base.js'
 import { authenticateWithOpenLive, getApiToken, isOnOsc } from './sat.js'
 
+// Paths that manage their own error toasts — skip global handler
+const SILENT_PATHS = ['/api/v1/status', '/api/v1/reconnect']
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   await authenticateWithOpenLive()
   const token = await getApiToken()
@@ -14,7 +17,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error((err as { error?: string }).error ?? res.statusText)
+    const message = (err as { error?: string }).error ?? res.statusText
+    if (!SILENT_PATHS.includes(path)) {
+      const { useToastStore } = await import('../store/toast.store')
+      const { upsertToastByTag } = useToastStore.getState()
+      if (res.status === 503) {
+        const { runReconnect } = await import('../hooks/useConnectionCheck')
+        upsertToastByTag('connection', 'Connection issues detected:', 'error', {
+          persistent: true,
+          onReconnect: runReconnect,
+          issues: ['Database unreachable'],
+          mergeIssues: true,
+        })
+      } else {
+        const { isInitialCheckDone } = await import('../hooks/useConnectionCheck')
+        if (isInitialCheckDone()) {
+          upsertToastByTag('api-error', message, 'error', { persistent: false })
+        }
+      }
+    }
+    throw new Error(message)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
@@ -277,6 +299,7 @@ export interface ApiStatus {
 
 export const statusApi = {
   get: () => request<ApiStatus>('/api/v1/status'),
+  reconnect: () => request<{ ok: boolean; db: boolean; strom: boolean }>('/api/v1/reconnect', { method: 'POST' }),
 }
 
 export const serverInfoApi = {
