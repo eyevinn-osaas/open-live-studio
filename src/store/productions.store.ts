@@ -24,6 +24,8 @@ export interface Production {
   values?: Record<string, string | number | boolean>
   airTime?: string
   deletionWarnings?: Array<{ type: 'source' | 'graphic' | 'output'; name: string }>
+  subscriberCount?: number
+  idleSinceAt?: number
 }
 
 interface ProductionsState {
@@ -65,6 +67,8 @@ function fromApi(p: ApiProduction): Production {
     values: p.values,
     airTime: p.airTime,
     deletionWarnings: p.deletionWarnings,
+    subscriberCount: p.subscriberCount,
+    idleSinceAt: p.idleSinceAt,
   }
 }
 
