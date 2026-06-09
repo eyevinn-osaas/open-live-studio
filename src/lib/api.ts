@@ -95,6 +95,9 @@ export interface ApiProduction {
   values?: Record<string, string | number | boolean>
   airTime?: string
   deletionWarnings?: Array<{ type: 'source' | 'graphic' | 'output'; name: string }>
+  subscriberCount?: number
+  /** Unix ms timestamp when this production went idle (0 subscribers). Set by backend watchdog. */
+  idleSinceAt?: number
 }
 
 export interface ProductionConfig {
@@ -121,6 +124,8 @@ type RawProduction = {
   values?: Record<string, string | number | boolean>
   airTime?: string
   deletionWarnings?: Array<{ type: 'source' | 'graphic' | 'output'; name: string }>
+  subscriberCount?: number
+  idleSinceAt?: number
 }
 
 function normalizeProduction(d: RawProduction): ApiProduction {
@@ -140,6 +145,8 @@ function normalizeProduction(d: RawProduction): ApiProduction {
     values: d.values,
     airTime: d.airTime,
     deletionWarnings: d.deletionWarnings,
+    subscriberCount: d.subscriberCount,
+    idleSinceAt: d.idleSinceAt,
   }
 }
 

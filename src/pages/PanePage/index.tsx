@@ -315,7 +315,7 @@ export function PanePage() {
     pane === 'pgm'         ? (selectedPgmUrl ?? pgmWhepEndpoint ?? null) :
     null
   )
-  const send = useControllerWs(pane !== 'multiviewer' ? productionId : null)
+  const send = useControllerWs(pane !== 'multiviewer' && pane !== 'pgm' ? productionId : null)
 
   const setElements = useAudioStore((s) => s.setElements)
   useEffect(() => {

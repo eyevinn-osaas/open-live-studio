@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getProgramMode } from '@/store/programClock.store'
 import { Link, useNavigate } from 'react-router'
 import { useProductionsStore, type Production } from '@/store/productions.store'
@@ -793,16 +793,43 @@ export function ProductionsPanel() {
 
   const [stromHost, setStromHost] = useState<string | undefined>(undefined)
 
-  // Poll productions every 15s; pre-load supporting resources once for modals
+  // Local idle tracking: productionId → timestamp when we first saw subscriberCount === 0
+  // Owned entirely by the frontend — no backend race conditions.
+  const idleSinceRef = useRef<Map<string, number>>(new Map())
+
+  // Update idle tracking whenever productions data changes
+  useEffect(() => {
+    const map = idleSinceRef.current
+    for (const prod of productions) {
+      if (prod.status === 'active') {
+        if ((prod.subscriberCount ?? 1) === 0) {
+          if (!map.has(prod.id)) map.set(prod.id, Date.now())
+        } else {
+          map.delete(prod.id)
+        }
+      } else {
+        map.delete(prod.id)
+      }
+    }
+  }, [productions])
+
+  const hasActiveProductions = productions.some((p) => p.status === 'active')
+
   useEffect(() => {
     void fetchAll()
     void fetchSources()
     void fetchGraphics()
     void fetchOutputs()
     void serverInfoApi.get().then((info) => setStromHost(info.stromHost)).catch(() => {})
-    const id = setInterval(() => void fetchAll(), 15000)
-    return () => clearInterval(id)
   }, [fetchAll, fetchSources, fetchGraphics, fetchOutputs])
+
+  useEffect(() => {
+    // Poll at 5s when there are active productions (to catch subscriber drops quickly),
+    // 15s otherwise
+    const interval = hasActiveProductions ? 5000 : 15000
+    const id = setInterval(() => void fetchAll(), interval)
+    return () => clearInterval(id)
+  }, [fetchAll, hasActiveProductions])
 
   // Ticks every second so on-air pills update in real time
   const [now, setNow] = useState(() => Date.now())
@@ -850,6 +877,20 @@ export function ProductionsPanel() {
           const programMode = getProgramMode(airStartMs, now)
           const isOnAir = programMode === 'onair'
 
+          // Idle countdown — prefer backend idleSinceAt (survives refresh),
+          // fall back to local ref (fast appearance before first watchdog tick)
+          const IDLE_TIMEOUT_MS = 2 * 60 * 1000
+          const localIdleSince = isActive ? (idleSinceRef.current.get(prod.id) ?? null) : null
+          const effectiveIdleSince = prod.idleSinceAt ?? localIdleSince
+          const idleElapsedMs = effectiveIdleSince !== null ? now - effectiveIdleSince : null
+          const idleRemainingMs = idleElapsedMs !== null ? Math.max(0, IDLE_TIMEOUT_MS - idleElapsedMs) : null
+          const idleRemainingSec = idleRemainingMs !== null ? Math.ceil(idleRemainingMs / 1000) : null
+          const idleMins = idleRemainingSec !== null ? Math.floor(idleRemainingSec / 60) : 0
+          const idleSecs = idleRemainingSec !== null ? idleRemainingSec % 60 : 0
+          const idleCountdown = idleRemainingSec !== null
+            ? `${idleMins}:${String(idleSecs).padStart(2, '0')}`
+            : null
+
           return (
             <div
               key={prod.id}
@@ -879,6 +920,15 @@ export function ProductionsPanel() {
                     <span className="shrink-0 inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-red-600 text-white leading-none">
                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
                       On Air
+                    </span>
+                  )}
+                  {isActive && idleRemainingSec !== null && idleRemainingSec <= 60 && (prod.subscriberCount ?? 0) === 0 && (
+                    <span className="shrink-0 inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-amber-600 text-white leading-none font-mono">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0">
+                        <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2.5"/>
+                        <path d="M12 7v5l3 3" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                      </svg>
+                      IDLE: De-activating in {idleCountdown}
                     </span>
                   )}
                   {prod.deletionWarnings && prod.deletionWarnings.length > 0 && (() => {
