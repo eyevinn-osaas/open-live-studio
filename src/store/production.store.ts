@@ -4,7 +4,17 @@ import { devtools } from 'zustand/middleware'
 import { useAudioStore } from './audio.store.js'
 import { usePipelineStore } from './pipeline.store.js'
 
-export type TransitionType = 'fade' | 'slide_left' | 'slide_right' | 'slide_up' | 'slide_down'
+export type TransitionType =
+  | 'fade' | 'dip_to_black'
+  | 'slide_left' | 'slide_right' | 'slide_up' | 'slide_down'
+  | 'push_left' | 'push_right' | 'push_up' | 'push_down'
+  | 'wipe_left' | 'wipe_right' | 'wipe_up' | 'wipe_down'
+  | 'iris_open' | 'iris_close' | 'clock_wipe' | 'blinds' | 'checker'
+  | 'noise_dissolve' | 'luma_wipe' | 'barn_doors' | 'star_wipe'
+  | 'pinwheel' | 'crosshatch' | 'hex_dissolve' | 'warp_wipe' | 'melt' | 'heart_iris'
+  | 'glitch_cut' | 'flash_dissolve' | 'whip_pan_left' | 'whip_pan_right'
+  | 'punch_zoom' | 'pixelate_take' | 'zoom_blur' | 'spin' | 'tv_roll'
+  | 'negative_flash' | 'ripple'
 
 export interface PipZone {
   rect: { x: number; y: number; w: number; h: number } | null
@@ -29,6 +39,29 @@ export interface PipConfig {
   /** Per-source crop/zoom transforms. Strom 0.6.2+; defaults to {} on older Strom. */
   transforms: PipTransforms
 }
+// ─── Video effects ─────────────────────────────────────────────────────────────
+
+export type VideoEffect =
+  | { type: 'none' }
+  | { type: 'chroma_key'; key_color: string; similarity: number; smoothness: number; spill: number }
+  | { type: 'pixelate'; block_size: number }
+  | { type: 'blur'; radius: number }
+  | { type: 'duotone'; low: string; high: string; mix: number }
+  | { type: 'vignette'; amount: number; softness: number }
+  | { type: 'vhs'; intensity: number }
+  | { type: 'old_film'; intensity: number }
+  | { type: 'edge_glow'; color: string; intensity: number }
+  | { type: 'crt'; intensity: number }
+  | { type: 'halftone'; dot_size: number }
+  | { type: 'thermal'; intensity: number }
+  | { type: 'night_vision'; intensity: number }
+  | { type: 'posterize'; levels: number }
+  | { type: 'underwater'; intensity: number }
+  | { type: 'color_correct'; brightness: number; contrast: number; saturation: number; hue: number; gamma: number; temperature: number; tint: number }
+
+/** Target for a video effect: an input index or the master output. */
+export type EffectTarget = { input: number } | 'master'
+
 
 interface ProductionState {
   /** Active mixer input on program, e.g. "video_in_0" */
@@ -52,6 +85,12 @@ interface ProductionState {
   pgmPip: number | null
   pvwPip: number | null
   pips: PipConfig[]
+  /** Whether GPU FX backend is available (from server FX_STATE message). */
+  fxAvailable: boolean
+  /** Per-input video effects: input index → VideoEffect. */
+  inputEffects: Record<number, VideoEffect>
+  /** Master output video effect. */
+  masterEffect: VideoEffect
 }
 
 interface ProductionActions {
@@ -74,6 +113,8 @@ interface ProductionActions {
   applyPipState: (pgmPip: number | null, pvwPip: number | null, pips: PipConfig[]) => void
   applyPipConfig: (pipIdx: number, config: PipConfig) => void
   setPvwPip: (pip: number | null) => void
+  /** Server-authoritative FX state setter — called by WS handler on FX_STATE */
+  applyFxState: (fxAvailable: boolean, inputEffects: VideoEffect[], masterEffect: VideoEffect) => void
 }
 
 export const useProductionStore = create<ProductionState & ProductionActions>()(
@@ -95,6 +136,9 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       pgmPip: null,
       pvwPip: null,
       pips: [],
+      fxAvailable: false,
+      inputEffects: {},
+      masterEffect: { type: 'none' as const },
 
       // Actions
       cut: () =>
@@ -204,6 +248,13 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       setPvwPip: (pip) =>
         set((state) => {
           state.pvwPip = pip
+        }),
+
+      applyFxState: (fxAvailable, inputEffects, masterEffect) =>
+        set((state) => {
+          state.fxAvailable = fxAvailable
+          state.inputEffects = Object.fromEntries(inputEffects.map((e, i) => [i, e]))
+          state.masterEffect = masterEffect
         }),
     })),
     { name: 'production', enabled: import.meta.env.DEV },

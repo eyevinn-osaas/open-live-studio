@@ -170,22 +170,46 @@ function CropEditor({
       } else {
         const h = drag.handle
         if (h.includes('e')) {
-          r.w = Math.round(clamp(r.w + dx, 10, CROP_SRC_W - r.x))
-          if (locked) r.h = Math.round(clamp(r.w / locked, 10, CROP_SRC_H - r.y))
+          if (locked) {
+            const maxW = Math.min(CROP_SRC_W - r.x, Math.floor((CROP_SRC_H - r.y) * locked))
+            r.w = Math.round(clamp(r.w + dx, 10, maxW))
+            r.h = Math.round(r.w / locked)
+          } else {
+            r.w = Math.round(clamp(r.w + dx, 10, CROP_SRC_W - r.x))
+          }
         }
         if (h.includes('s')) {
-          r.h = Math.round(clamp(r.h + dy, 10, CROP_SRC_H - r.y))
-          if (locked) r.w = Math.round(clamp(r.h * locked, 10, CROP_SRC_W - r.x))
+          if (locked) {
+            const maxH = Math.min(CROP_SRC_H - r.y, Math.floor((CROP_SRC_W - r.x) / locked))
+            r.h = Math.round(clamp(r.h + dy, 10, maxH))
+            r.w = Math.round(r.h * locked)
+          } else {
+            r.h = Math.round(clamp(r.h + dy, 10, CROP_SRC_H - r.y))
+          }
         }
         if (h.includes('w')) {
-          const newX = Math.round(clamp(r.x + dx, 0, r.x + r.w - 10))
-          r.w = r.x + r.w - newX; r.x = newX
-          if (locked) r.h = Math.round(clamp(r.w / locked, 10, CROP_SRC_H - r.y))
+          if (locked) {
+            const maxDx = r.x + r.w - 10
+            const newX = Math.round(clamp(r.x + dx, 0, maxDx))
+            const newW = Math.min(r.x + r.w - newX, Math.floor((CROP_SRC_H - r.y) * locked))
+            r.x = r.x + r.w - newW; r.w = newW
+            r.h = Math.round(r.w / locked)
+          } else {
+            const newX = Math.round(clamp(r.x + dx, 0, r.x + r.w - 10))
+            r.w = r.x + r.w - newX; r.x = newX
+          }
         }
         if (h.includes('n')) {
-          const newY = Math.round(clamp(r.y + dy, 0, r.y + r.h - 10))
-          r.h = r.y + r.h - newY; r.y = newY
-          if (locked) r.w = Math.round(clamp(r.h * locked, 10, CROP_SRC_W - r.x))
+          if (locked) {
+            const maxDy = r.y + r.h - 10
+            const newY = Math.round(clamp(r.y + dy, 0, maxDy))
+            const newH = Math.min(r.y + r.h - newY, Math.floor((CROP_SRC_W - r.x) / locked))
+            r.y = r.y + r.h - newH; r.h = newH
+            r.w = Math.round(r.h * locked)
+          } else {
+            const newY = Math.round(clamp(r.y + dy, 0, r.y + r.h - 10))
+            r.h = r.y + r.h - newY; r.y = newY
+          }
         }
       }
       commit(r)
@@ -249,7 +273,7 @@ function CropEditor({
       <div
         ref={canvasRef}
         className="relative select-none overflow-hidden shrink-0"
-        style={{ width: CROP_CANVAS_W, height: CROP_CANVAS_H, background: '#0a0a0a', border: '1px solid #3f3f46' }}
+        style={{ width: CROP_CANVAS_W, height: CROP_CANVAS_H, background: '#0a0a0a', border: '1px solid #3f3f46', boxSizing: 'content-box' }}
       >
         {/* Masked (cropped-out) overlay — four rects */}
         {/* left */}
@@ -333,14 +357,29 @@ function CropEditor({
             />
           </label>
         ))}
-        {/* Aspect lock */}
+        {/* Aspect lock — when locking, reset to original 16:9 keeping current zoom */}
         <label className="flex flex-col items-center gap-0.5 shrink-0 cursor-pointer select-none">
           <span className="text-[8px] text-zinc-500 uppercase">Lock</span>
           <input
             type="checkbox"
             checked={aspectLocked}
             onChange={(e) => {
-              setAspectLocked(e.target.checked)
+              const locking = e.target.checked
+              setAspectLocked(locking)
+              if (locking) {
+                // Source is 16:9, so for a 16:9 crop: pixel_w/pixel_h = W/H
+                // → (curW*W)/(curH*H) = W/H → curH = curW
+                const curW = 1 - crop.left - crop.right
+                const newH = curW  // equal fractions = 16:9 for a 16:9 source
+                const cx = crop.left + curW / 2
+                const cy = crop.top + (1 - crop.top - crop.bottom) / 2
+                commit({
+                  x: Math.round(clamp(cx - curW / 2, 0, 1 - curW) * CROP_SRC_W),
+                  y: Math.round(clamp(cy - newH / 2, 0, 1 - newH) * CROP_SRC_H),
+                  w: Math.round(curW * CROP_SRC_W),
+                  h: Math.round(newH * CROP_SRC_H),
+                })
+              }
             }}
             className="w-[18px] h-[18px] accent-orange-500 cursor-pointer"
           />
@@ -418,7 +457,7 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
     .sort((a, b) => a.mixerInput.localeCompare(b.mixerInput))
     .map((a, idx) => {
       const src = sources.find((s) => s.id === a.sourceId)
-      const name = (src?.name ?? VIRTUAL_SOURCE_NAMES[a.sourceId] ?? a.sourceId).toUpperCase().slice(0, 8)
+      const name = (src?.name ?? VIRTUAL_SOURCE_NAMES[a.sourceId] ?? a.sourceId).toUpperCase()
       return { idx, name }
     })
 
@@ -604,6 +643,40 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
     }
   }
 
+  const sourceChips = (
+    <div>
+      <span className="text-[9px] text-zinc-500 uppercase tracking-wider block mb-1">
+        {draft.zones.length === 0 ? 'Sources' : `Sources → Zone ${activeZoneIdx + 1}`}
+      </span>
+      <div className="flex flex-wrap gap-1">
+        {inputSlots.map((slot) => {
+          const inActive = isInActiveZone(slot.idx)
+          const asBg = isUsedAsBg(slot.idx)
+          const inOther = !inActive && !asBg && isInAnyZone(slot.idx)
+          return (
+            <button
+              key={slot.idx}
+              onClick={() => handleSourceClick(slot.idx)}
+              disabled={asBg}
+              className={cn(
+                'px-1.5 py-0.5 text-[10px] font-bold border',
+                inActive
+                  ? 'bg-orange-500 text-black border-orange-400'
+                  : asBg
+                    ? 'bg-zinc-800 text-zinc-600 border-zinc-700 cursor-not-allowed'
+                    : inOther
+                      ? 'bg-zinc-900 text-zinc-600 border-zinc-700 italic'
+                      : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-zinc-500 hover:text-white',
+              )}
+            >
+              {slot.name}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
   return (
     <div className={cn('flex flex-col gap-2 p-2 border border-zinc-800 bg-zinc-950', className)}>
       {/* Header row: pip tabs + edit/done toggle */}
@@ -642,7 +715,9 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
       </div>
 
       {editMode ? (
-        /* ── EDIT MODE: canvas + zone management ── */
+        /* ── EDIT MODE: source mapping at top, then canvas + zone management ── */
+        <div className="flex flex-col gap-2">
+          {sourceChips}
         <div className="flex gap-2">
           {/* Left column: canvas + pixel inputs */}
           <div className="flex flex-col shrink-0">
@@ -861,6 +936,7 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
             </div>
           </div>
         </div>
+        </div>
       ) : (
         /* ── VIEW MODE: zone selector only ── */
         draft.zones.length > 0 ? (
@@ -901,61 +977,36 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
         )
       )}
 
-      {/* Source chips — always visible */}
-      <div>
-        <span className="text-[9px] text-zinc-500 uppercase tracking-wider block mb-1">
-          {editMode
-            ? (draft.zones.length === 0 ? 'Sources' : `Sources → Zone ${activeZoneIdx + 1}`)
-            : (draft.zones.length === 0 ? 'Sources' : `Sources → Zone ${activeZoneIdx + 1}`)}
-        </span>
-        <div className="flex flex-wrap gap-1">
-          {inputSlots.map((slot) => {
-            const inActive = isInActiveZone(slot.idx)
-            const asBg = isUsedAsBg(slot.idx)
-            const inOther = !inActive && !asBg && isInAnyZone(slot.idx)
-            const isSelected = selectedSourceIdx === slot.idx
-            const hasCrop = !isCropZero(draft.transforms?.[slot.idx] ?? EMPTY_CROP)
-            return (
-              <button
-                key={slot.idx}
-                onClick={() => {
-                  handleSourceClick(slot.idx)
-                  setSelectedSourceIdx((prev) => prev === slot.idx ? null : slot.idx)
-                }}
-                disabled={asBg}
-                className={cn(
-                  'px-1.5 py-0.5 text-[10px] font-bold border relative',
-                  inActive
-                    ? 'bg-orange-500 text-black border-orange-400'
-                    : asBg
-                      ? 'bg-zinc-800 text-zinc-600 border-zinc-700 cursor-not-allowed'
-                      : inOther
-                        ? 'bg-zinc-900 text-zinc-600 border-zinc-700 italic'
-                        : isSelected
-                          ? 'bg-zinc-700 text-zinc-200 border-zinc-500'
-                          : 'bg-zinc-900 text-zinc-300 border-zinc-700 hover:border-zinc-500 hover:text-white',
-                )}
-              >
-                {slot.name}
-                {hasCrop && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange-500 border border-zinc-950" />
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      {/* Source chips — below content in view mode */}
+      {!editMode && sourceChips}
 
-      {/* Crop / Zoom editor — shown when a source chip is selected */}
-      {selectedSourceIdx !== null && !isUsedAsBg(selectedSourceIdx) && (
-        <CropEditor
-          inputIdx={selectedSourceIdx}
-          transforms={draft.transforms ?? {}}
-          onChange={(transforms) => {
-            markDirty()
-            setDraft((prev) => ({ ...prev, transforms }))
-          }}
-        />
+      {/* Crop / Zoom editor — only shown in edit mode */}
+      {editMode && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-zinc-500 uppercase tracking-wider shrink-0">Crop / Zoom</span>
+            <select
+              value={selectedSourceIdx ?? ''}
+              onChange={(e) => setSelectedSourceIdx(e.target.value === '' ? null : parseInt(e.target.value, 10))}
+              className="flex-1 bg-zinc-900 border border-zinc-700 text-zinc-300 text-[10px] px-1.5 py-0.5 focus:outline-none focus:border-zinc-500"
+            >
+              <option value="">None</option>
+              {inputSlots.filter((s) => !isUsedAsBg(s.idx)).map((slot) => (
+                <option key={slot.idx} value={slot.idx}>{slot.name}</option>
+              ))}
+            </select>
+          </div>
+          {selectedSourceIdx !== null && !isUsedAsBg(selectedSourceIdx) && (
+            <CropEditor
+              inputIdx={selectedSourceIdx}
+              transforms={draft.transforms ?? {}}
+              onChange={(transforms) => {
+                markDirty()
+                setDraft((prev) => ({ ...prev, transforms }))
+              }}
+            />
+          )}
+        </div>
       )}
     </div>
   )
