@@ -97,7 +97,10 @@ export class WhepClient {
       }
 
       this.pc.onicecandidateerror = (e) => {
-        console.warn('[WhepClient] ICE candidate error:', e.errorCode, e.errorText, e.url)
+        // Log only non-sensitive fields — never log e.url (may contain TURN credentials)
+        if (import.meta.env.DEV) {
+          console.warn('[WhepClient] ICE candidate error:', e.errorCode, e.errorText)
+        }
       }
 
       this.pc.onicecandidate = (_e) => { /* ICE candidate events — no logging needed */ }

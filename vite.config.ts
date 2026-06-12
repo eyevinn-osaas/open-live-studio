@@ -4,7 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 
 export default defineConfig({
-  envPrefix: ['OPEN_LIVE_', 'OSC_'],
+  // OSC_ removed — secrets (OSC_PAT) are runtime-only via window._env_, never baked into the bundle
+  envPrefix: ['OPEN_LIVE_'],
   plugins: [
     tailwindcss(),
     react(),

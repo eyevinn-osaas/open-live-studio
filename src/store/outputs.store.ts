@@ -58,6 +58,6 @@ export const useOutputsStore = create<OutputsState & OutputsActions>()(
         set((state) => { state.outputs = state.outputs.filter((o) => o.id !== id) })
       },
     })),
-    { name: 'outputs' },
+    { name: 'outputs', enabled: import.meta.env.DEV },
   ),
 )

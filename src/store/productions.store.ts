@@ -7,6 +7,9 @@ export type ProductionStatus = 'active' | 'inactive' | 'activating'
 
 const ACTIVATION_POLL_INTERVAL_MS = 1000
 const ACTIVATION_POLL_TIMEOUT_MS = 35000
+// Minimum delay before retrying after a network error — prevents burst-recursion
+// when errors resolve instantly (e.g. DNS NXDOMAIN returning immediately)
+const ACTIVATION_POLL_ERROR_DELAY_MS = 2000
 
 export interface Production {
   id: string
@@ -152,7 +155,8 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
               }
             } catch (err) {
               console.error(`[productions] Activation poll error for ${id}:`, err)
-              // Retry on network error unless past deadline
+              // Wait before retrying to prevent burst-recursion on instant-failing errors
+              await new Promise<void>((resolve) => setTimeout(resolve, ACTIVATION_POLL_ERROR_DELAY_MS))
               await poll()
             }
           }
@@ -247,6 +251,6 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
         })
       },
     })),
-    { name: 'productions' },
+    { name: 'productions', enabled: import.meta.env.DEV },
   ),
 )

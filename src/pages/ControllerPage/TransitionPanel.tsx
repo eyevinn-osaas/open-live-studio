@@ -5,14 +5,60 @@ import { cn } from '@/lib/cn'
 import { useRef, useCallback, useState, useEffect } from 'react'
 
 const DURATION_PRESETS_MS = [500, 1000, 2000]
-const TRANSITION_TYPES: TransitionType[] = ['fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down']
+const TRANSITION_TYPES: TransitionType[] = [
+  'fade', 'dip_to_black',
+  'slide_left', 'slide_right', 'slide_up', 'slide_down',
+  'push_left', 'push_right', 'push_up', 'push_down',
+  'wipe_left', 'wipe_right', 'wipe_up', 'wipe_down',
+  'iris_open', 'iris_close', 'clock_wipe', 'blinds', 'checker',
+  'noise_dissolve', 'luma_wipe', 'barn_doors', 'star_wipe',
+  'pinwheel', 'crosshatch', 'hex_dissolve', 'warp_wipe', 'melt', 'heart_iris',
+  'glitch_cut', 'flash_dissolve', 'whip_pan_left', 'whip_pan_right',
+  'punch_zoom', 'pixelate_take', 'zoom_blur', 'spin', 'tv_roll',
+  'negative_flash', 'ripple',
+]
 
-const TRANSITION_LABELS: Record<TransitionType, string> = {
-  fade:        'FADE',
-  slide_left:  '← PUSH',
-  slide_right: '→ PUSH',
-  slide_up:    '↑ PUSH',
-  slide_down:  '↓ PUSH',
+export const TRANSITION_LABELS: Record<TransitionType, string> = {
+  fade:           'FADE',
+  dip_to_black:   'DIP',
+  slide_left:     '← SLIDE',
+  slide_right:    '→ SLIDE',
+  slide_up:       '↑ SLIDE',
+  slide_down:     '↓ SLIDE',
+  push_left:      '← PUSH',
+  push_right:     '→ PUSH',
+  push_up:        '↑ PUSH',
+  push_down:      '↓ PUSH',
+  wipe_left:      '← WIPE',
+  wipe_right:     '→ WIPE',
+  wipe_up:        '↑ WIPE',
+  wipe_down:      '↓ WIPE',
+  iris_open:      'IRIS IN',
+  iris_close:     'IRIS OUT',
+  clock_wipe:     'CLOCK',
+  blinds:         'BLINDS',
+  checker:        'CHECKER',
+  noise_dissolve: 'NOISE',
+  luma_wipe:      'LUMA',
+  barn_doors:     'BARN',
+  star_wipe:      'STAR',
+  pinwheel:       'PINWHEEL',
+  crosshatch:     'CROSSHATCH',
+  hex_dissolve:   'HEX',
+  warp_wipe:      'WARP',
+  melt:           'MELT',
+  heart_iris:     'HEART',
+  glitch_cut:     'GLITCH',
+  flash_dissolve: 'FLASH',
+  whip_pan_left:  '← WHIP',
+  whip_pan_right: '→ WHIP',
+  punch_zoom:     'PUNCH',
+  pixelate_take:  'PIXELATE',
+  zoom_blur:      'ZOOM',
+  spin:           'SPIN',
+  tv_roll:        'ROLL',
+  negative_flash: 'NEGATIVE',
+  ripple:         'RIPPLE',
 }
 
 interface TransitionPanelProps {

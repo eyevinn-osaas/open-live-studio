@@ -1,7 +1,7 @@
 # Stage 1: build
 FROM node:22-alpine AS builder
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
@@ -28,6 +28,8 @@ RUN printf 'server {\n\
     location = /env-config.js {\n\
         add_header Cache-Control "no-store, no-cache, must-revalidate" always;\n\
         add_header Pragma "no-cache" always;\n\
+        add_header X-Robots-Tag "noindex" always;\n\
+        expires off;\n\
     }\n\
     location / {\n\
         try_files $uri $uri/ /index.html;\n\

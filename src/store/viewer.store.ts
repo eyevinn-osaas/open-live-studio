@@ -62,6 +62,6 @@ export const useViewerStore = create<ViewerState & ViewerActions>()(
         set({ programStream: null, connectionState: 'disconnected', isMockStream: false, audioTrackCount: 0, retryAttempt: 0 })
       },
     }),
-    { name: 'viewer' },
+    { name: 'viewer', enabled: import.meta.env.DEV },
   ),
 )

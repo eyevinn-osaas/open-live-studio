@@ -52,6 +52,6 @@ export const usePipelineStore = create<PipelineState & PipelineActions>()(
           state.uptimeSeconds = 0
         }),
     })),
-    { name: 'pipeline' },
+    { name: 'pipeline', enabled: import.meta.env.DEV },
   ),
 )

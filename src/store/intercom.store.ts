@@ -60,6 +60,6 @@ export const useIntercomStore = create<IntercomState & IntercomActions>()(
 
       isJoined: (id) => get().joinedLineIds.includes(id),
     }),
-    { name: 'intercom' },
+    { name: 'intercom', enabled: import.meta.env.DEV },
   ),
 )

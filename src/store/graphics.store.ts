@@ -57,6 +57,6 @@ export const useGraphicsStore = create<GraphicsState & GraphicsActions>()(
         set((state) => { state.graphics = state.graphics.filter((g) => g.id !== id) })
       },
     })),
-    { name: 'graphics' },
+    { name: 'graphics', enabled: import.meta.env.DEV },
   ),
 )

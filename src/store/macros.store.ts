@@ -60,6 +60,6 @@ export const useMacrosStore = create<MacrosState & MacrosActions>()(
         })
       },
     })),
-    { name: 'macros' },
+    { name: 'macros', enabled: import.meta.env.DEV },
   ),
 )

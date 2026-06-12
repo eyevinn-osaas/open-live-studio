@@ -112,6 +112,6 @@ export const useSourcesStore = create<SourcesState & SourcesActions>()(
         })
       },
     })),
-    { name: 'sources' },
+    { name: 'sources', enabled: import.meta.env.DEV },
   ),
 )
