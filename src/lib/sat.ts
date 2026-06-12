@@ -35,10 +35,11 @@ function isExpiringSoon(c: SatCache): boolean {
 }
 
 function getPat(): string | undefined {
+  // OSC_PAT must only come from window._env_ (injected at runtime by docker-entrypoint.sh).
+  // It must never be read from import.meta.env — that would bake it into the JS bundle.
   return (
     (typeof window !== 'undefined' &&
       (window as unknown as { _env_?: { OSC_PAT?: string } })._env_?.OSC_PAT) ||
-    (import.meta.env.OSC_PAT as string | undefined) ||
     undefined
   )
 }
@@ -94,10 +95,24 @@ export async function authenticateWithOpenLive(): Promise<number> {
   const sat = await getApiToken()
   if (!sat) return 0
 
-  const parts = sat.split('.')
-  const payload = JSON.parse(atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/'))) as { exp: number }
-  const maxAge = payload.exp - Math.floor(Date.now() / 1000)
+  let maxAge = 3600 // default 1h if we cannot parse
+  try {
+    const parts = sat.split('.')
+    if (parts.length < 3) throw new Error('Malformed JWT: expected 3 dot-separated parts')
+    const payload = JSON.parse(atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/'))) as unknown
+    const exp = typeof (payload as Record<string, unknown>)?.['exp'] === 'number'
+      ? (payload as { exp: number }).exp
+      : 0
+    if (exp > 0) {
+      maxAge = Math.max(0, exp - Math.floor(Date.now() / 1000))
+    }
+  } catch (err) {
+    console.error('[sat] Failed to parse SAT JWT for cookie expiry — using 1h default:', err)
+  }
 
+  // Note: HttpOnly cannot be set via document.cookie (requires Set-Cookie response header).
+  // The SAT is intentionally readable by JS so it can be sent as a Bearer token in API calls.
+  // Compensating control: strict same-origin policy + short token lifetime (1h).
   document.cookie = [
     `${OPEN_LIVE_SERVICE_ID}.sat=${encodeURIComponent('Bearer ' + sat)}`,
     `domain=${OSC_COOKIE_DOMAIN}`,
@@ -107,5 +122,6 @@ export async function authenticateWithOpenLive(): Promise<number> {
     `Secure`,
   ].join('; ')
 
-  return payload.exp * 1000
+  // Return expiry in ms (used by caller to schedule re-authentication)
+  return maxAge > 0 ? (Math.floor(Date.now() / 1000) + maxAge) * 1000 : 0
 }

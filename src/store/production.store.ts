@@ -206,6 +206,6 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
           state.pvwPip = pip
         }),
     })),
-    { name: 'production' },
+    { name: 'production', enabled: import.meta.env.DEV },
   ),
 )

@@ -335,6 +335,6 @@ export const useAudioStore = create<AudioState & AudioActions>()(
       togglePfl: (elementId) =>
         _set((s) => { s.pfl[elementId] = !s.pfl[elementId] }),
     })),
-    { name: 'audio' },
+    { name: 'audio', enabled: import.meta.env.DEV },
   ),
 )
