@@ -28,7 +28,8 @@ export interface Production {
   airTime?: string
   deletionWarnings?: Array<{ type: 'source' | 'graphic' | 'output'; name: string }>
   subscriberCount?: number
-  idleSinceAt?: number
+  autoDeactivated?: boolean
+  idleExpiresAt?: number
 }
 
 interface ProductionsState {
@@ -42,6 +43,7 @@ interface ProductionsActions {
   addProduction: (name: string) => Promise<void>
   removeProduction: (id: string) => Promise<void>
   updateStatus: (id: string, status: ProductionStatus) => Promise<void>
+  markInactive: (id: string) => void
   updateName: (id: string, name: string) => Promise<void>
   updateValues: (id: string, values: Record<string, string | number | boolean>) => Promise<void>
   updateAirTime: (id: string, airTime: string | null) => Promise<void>
@@ -71,7 +73,8 @@ function fromApi(p: ApiProduction): Production {
     airTime: p.airTime,
     deletionWarnings: p.deletionWarnings,
     subscriberCount: p.subscriberCount,
-    idleSinceAt: p.idleSinceAt,
+    autoDeactivated: p.autoDeactivated,
+    idleExpiresAt: p.idleExpiresAt,
   }
 }
 
@@ -162,6 +165,21 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
           }
           await poll()
         }
+      },
+
+      markInactive: (id) => {
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (prod) {
+            prod.status = 'inactive'
+            prod.stromFlowId = undefined
+            prod.whepEndpoint = undefined
+            prod.pgmWhepEndpoint = undefined
+            prod.whipEndpoints = undefined
+            prod.srtOutputUri = undefined
+            prod.whepOutputUrls = undefined
+          }
+        })
       },
 
       updateName: async (id, name) => {

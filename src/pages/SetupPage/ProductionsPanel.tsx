@@ -522,7 +522,7 @@ function ProductionOptionsModal({ production, onClose }: OptionsModalProps) {
                 <ConfigFieldGroup label="PGM" ids={['pgm_resolution', 'pgm_framerate', 'bitrate']} properties={tProps} values={configValues} onChange={cfgOnChange} />
               </div>
               <div className="flex flex-col gap-4 pl-6">
-                <ConfigFieldGroup label="Multiviewer" ids={['multiview_resolution', 'multiview_framerate', 'multiview_bitrate']} properties={tProps} values={configValues} onChange={cfgOnChange} />
+                <ConfigFieldGroup label="Multiviewer" ids={['multiview_resolution', 'multiview_framerate', 'multiview_bitrate', 'swap_pvw_pgm']} properties={tProps} values={configValues} onChange={cfgOnChange} />
                 <ConfigFieldGroup label="Audio" ids={['num_aux_buses', 'num_groups', 'ebu_main']} properties={tProps} values={configValues} onChange={cfgOnChange} />
                 <ConfigFieldGroup label="Picture in Picture" ids={['num_pips']} properties={tProps} values={configValues} onChange={cfgOnChange} />
               </div>
@@ -755,7 +755,7 @@ function CreateProductionModal({ onClose, onCreated }: CreateModalProps) {
                   <ConfigFieldGroup label="PGM" ids={['pgm_resolution', 'pgm_framerate', 'bitrate']} properties={tProps} values={configValues} onChange={handlePropertyChange} />
                 </div>
                 <div className="flex flex-col gap-4 pl-6">
-                  <ConfigFieldGroup label="Multiviewer" ids={['multiview_resolution', 'multiview_framerate', 'multiview_bitrate']} properties={tProps} values={configValues} onChange={handlePropertyChange} />
+                  <ConfigFieldGroup label="Multiviewer" ids={['multiview_resolution', 'multiview_framerate', 'multiview_bitrate', 'swap_pvw_pgm']} properties={tProps} values={configValues} onChange={handlePropertyChange} />
                   <ConfigFieldGroup label="Audio" ids={['num_aux_buses', 'num_groups', 'ebu_main']} properties={tProps} values={configValues} onChange={handlePropertyChange} />
                   <ConfigFieldGroup label="Picture in Picture" ids={['num_pips']} properties={tProps} values={configValues} onChange={handlePropertyChange} />
                 </div>
@@ -793,25 +793,6 @@ export function ProductionsPanel() {
 
   const [stromHost, setStromHost] = useState<string | undefined>(undefined)
 
-  // Local idle tracking: productionId → timestamp when we first saw subscriberCount === 0
-  // Owned entirely by the frontend — no backend race conditions.
-  const idleSinceRef = useRef<Map<string, number>>(new Map())
-
-  // Update idle tracking whenever productions data changes
-  useEffect(() => {
-    const map = idleSinceRef.current
-    for (const prod of productions) {
-      if (prod.status === 'active') {
-        if ((prod.subscriberCount ?? 1) === 0) {
-          if (!map.has(prod.id)) map.set(prod.id, Date.now())
-        } else {
-          map.delete(prod.id)
-        }
-      } else {
-        map.delete(prod.id)
-      }
-    }
-  }, [productions])
 
   const hasActiveProductions = productions.some((p) => p.status === 'active')
 
@@ -877,18 +858,12 @@ export function ProductionsPanel() {
           const programMode = getProgramMode(airStartMs, now)
           const isOnAir = programMode === 'onair'
 
-          // Idle countdown — prefer backend idleSinceAt (survives refresh),
-          // fall back to local ref (fast appearance before first watchdog tick)
-          const IDLE_TIMEOUT_MS = 2 * 60 * 1000
-          const localIdleSince = isActive ? (idleSinceRef.current.get(prod.id) ?? null) : null
-          const effectiveIdleSince = prod.idleSinceAt ?? localIdleSince
-          const idleElapsedMs = effectiveIdleSince !== null ? now - effectiveIdleSince : null
-          const idleRemainingMs = idleElapsedMs !== null ? Math.max(0, IDLE_TIMEOUT_MS - idleElapsedMs) : null
+          // Idle countdown — driven entirely by backend-supplied expiry timestamp
+          const idleRemainingMs = isActive && prod.idleExpiresAt != null ? Math.max(0, prod.idleExpiresAt - now) : null
           const idleRemainingSec = idleRemainingMs !== null ? Math.ceil(idleRemainingMs / 1000) : null
-          const idleMins = idleRemainingSec !== null ? Math.floor(idleRemainingSec / 60) : 0
-          const idleSecs = idleRemainingSec !== null ? idleRemainingSec % 60 : 0
-          const idleCountdown = idleRemainingSec !== null
-            ? `${idleMins}:${String(idleSecs).padStart(2, '0')}`
+          const isDeactivating = idleRemainingMs === 0
+          const idleCountdown = idleRemainingSec !== null && !isDeactivating
+            ? `${Math.floor(idleRemainingSec / 60)}:${String(idleRemainingSec % 60).padStart(2, '0')}`
             : null
 
           return (
@@ -916,10 +891,26 @@ export function ProductionsPanel() {
                   <span className="text-sm font-medium text-[--color-text-primary] truncate">
                     {prod.name}
                   </span>
+                  {!isActive && !isActivating && prod.autoDeactivated && (
+                    <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-zinc-700 text-zinc-400 border border-zinc-600 leading-none">
+                      <svg width="7" height="7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0">
+                        <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm.75 5.25v5.5l4 2.25-.75 1.25-4.5-2.75V7.25h1.25z"/>
+                      </svg>
+                      Idle timeout
+                    </span>
+                  )}
                   {isActive && isOnAir && (
                     <span className="shrink-0 inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-red-600 text-white leading-none">
                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
                       On Air
+                    </span>
+                  )}
+                  {isActive && (
+                    <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-zinc-700 text-zinc-300 leading-none">
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0">
+                        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                      </svg>
+                      {prod.subscriberCount}
                     </span>
                   )}
                   {isActive && idleRemainingSec !== null && idleRemainingSec <= 60 && (prod.subscriberCount ?? 0) === 0 && (
@@ -928,7 +919,7 @@ export function ProductionsPanel() {
                         <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="2.5"/>
                         <path d="M12 7v5l3 3" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
                       </svg>
-                      IDLE: De-activating in {idleCountdown}
+                      {isDeactivating ? 'De-activating…' : `IDLE: De-activating in ${idleCountdown}`}
                     </span>
                   )}
                   {prod.deletionWarnings && prod.deletionWarnings.length > 0 && (() => {
@@ -1011,8 +1002,8 @@ export function ProductionsPanel() {
                 {isActive && (
                   <Link
                     to={`/studio?production=${prod.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-[--color-accent]/10 text-[--color-accent] border border-[--color-accent]/30 hover:bg-[--color-accent]/20 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); if (isDeactivating) e.preventDefault() }}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition-colors ${isDeactivating ? 'opacity-40 pointer-events-none bg-[--color-accent]/10 text-[--color-accent] border-[--color-accent]/30' : 'bg-[--color-accent]/10 text-[--color-accent] border-[--color-accent]/30 hover:bg-[--color-accent]/20'}`}
                   >
                     <svg width="12" height="12" viewBox="0 2 24 24" fill="none" aria-hidden="true">
                       <rect x="3" y="8" width="18" height="13" rx="1.5" stroke="var(--color-accent)" strokeWidth="1.5" />
@@ -1029,11 +1020,11 @@ export function ProductionsPanel() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    disabled={isActivating}
+                    disabled={isActivating || isDeactivating}
                     onClick={(e) => { e.stopPropagation(); setDeactivateTargetId(prod.id) }}
                     className="text-orange-500 hover:text-orange-400 border-transparent"
                   >
-                    Deactivate
+                    {isDeactivating ? 'De-activating…' : 'Deactivate'}
                   </Button>
                 ) : (
                   <Button
