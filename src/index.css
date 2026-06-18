@@ -44,6 +44,7 @@ body,
   color: var(--color-text-primary);
   font-family: 'IBM Plex Mono', ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
   -webkit-font-smoothing: antialiased;
+  scrollbar-gutter: stable;
   font-size: 13px;
   line-height: 1.4;
   letter-spacing: 0.02em;
