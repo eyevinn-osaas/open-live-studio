@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { useProductionStore } from '@/store/production.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { useGraphicsStore } from '@/store/graphics.store'
@@ -24,7 +25,7 @@ export function DskPanel({ onToggle }: DskPanelProps) {
     <div className="flex items-stretch border border-zinc-800 bg-zinc-950" style={{ minHeight: 48 }}>
       {/* Section label */}
       <div className="flex items-center justify-center border-r border-zinc-800 shrink-0" style={{ width: 40 }}>
-        <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-500">DSK</span>
+        <Tooltip content="Downstream Keyer — overlay graphics on the programme output"><span className="text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-500">DSK</span></Tooltip>
       </div>
       <div className="flex gap-px flex-1 p-1">
         {assignments.map((a) => {

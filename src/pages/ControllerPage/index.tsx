@@ -360,7 +360,7 @@ function ControllerOptionsContent({
         {/* ── Transitions ─────────────────────────────────────────────────────── */}
         <div className="flex flex-col flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Visible transitions</span>
+            <Tooltip content="Choose which transition types appear as chips in the controller. At least one must remain active."><span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Visible transitions</span></Tooltip>
             <span className="text-[9px] font-mono font-bold tabular-nums text-orange-500">{draftTransitions.length}/16</span>
           </div>
           <div className="flex flex-col border border-zinc-800 rounded overflow-hidden">

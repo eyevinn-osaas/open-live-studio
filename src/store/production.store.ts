@@ -16,10 +16,19 @@ export type TransitionType =
   | 'punch_zoom' | 'pixelate_take' | 'zoom_blur' | 'spin' | 'tv_roll'
   | 'negative_flash' | 'ripple'
 
+export interface ZoneBorder {
+  /** #RRGGBB or #RRGGBBAA hex string */
+  color: string
+  /** Width in PGM canvas pixels (0–64) */
+  width: number
+}
+
 export interface PipZone {
   rect: { x: number; y: number; w: number; h: number } | null
   capacity: number | null
   sources: number[]
+  /** Border drawn around each source box in this zone. Strom 0.6.6+. */
+  border?: ZoneBorder
 }
 
 /** Normalized per-source crop: fraction hidden from each edge (0.0–1.0). */

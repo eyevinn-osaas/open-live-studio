@@ -37,7 +37,7 @@ function ConfigLayout({
         <ConfigFieldGroup label="PGM"         ids={['pgm_resolution', 'pgm_framerate', 'bitrate']}    properties={tProps} values={values} onChange={onChange} />
       </div>
       <div className="flex flex-col gap-4">
-        <ConfigFieldGroup label="Multiviewer" ids={['multiview_resolution', 'multiview_framerate', 'multiview_bitrate']} properties={tProps} values={values} onChange={onChange} />
+        <ConfigFieldGroup label="Multiviewer" ids={['multiview_resolution', 'multiview_framerate', 'multiview_bitrate', 'swap_pvw_pgm']} properties={tProps} values={values} onChange={onChange} />
         <ConfigFieldGroup label="Audio"       ids={['num_aux_buses', 'num_groups', 'ebu_main']}       properties={tProps} values={values} onChange={onChange} />
         <ConfigFieldGroup label="Picture in Picture" ids={['num_pips']}                               properties={tProps} values={values} onChange={onChange} />
       </div>
