@@ -8,7 +8,7 @@ import { ApiError, sourcesApi, type AudioStreamsResponse, type HtmlSourceAuth, t
 import { openHtmlAuthPopup, originOf, maskCredential } from '@/lib/htmlSourceAuthPopup'
 import { heartbeatAge, indexGatewaysBySource } from '@/lib/gateway'
 import { buildListenerAddress, isCallerAddress, listenerPort, passphraseOf, srtDirection, toCallerUrl, type SrtDirection } from '@/lib/srt'
-import { EFP_AUDIO_STREAM_NOTE, audioStreamIndexPatch, efpIgnoredAudioStreamNote, supportsAudioStreamSelection } from '@/lib/audio-stream-index'
+import { EFP_AUDIO_STREAM_NOTE, audioStreamIndexPatch, efpIgnoredAudioStreamNote, newSourceAudioStreamIndex, supportsAudioStreamSelection } from '@/lib/audio-stream-index'
 import { Button } from '@/components/ui/Button'
 import { StatusDot } from '@/components/ui/StatusDot'
 import { Modal } from '@/components/ui/Modal'
@@ -17,6 +17,8 @@ import { DirectionToggle, ListenerFields, inputCls, labelCls, listenerPortFor, l
 import { ClipReferenceFields } from '@/components/ui/ClipReferenceFields'
 import { emptyClipRef, parseClipRef, serializeClipRef, validateClipRef, type ClipRefState } from '@/lib/clipRef'
 import { useIsPhone } from '@/hooks/usePhoneLayout'
+import { LATENCY_DEFAULT_MS, LATENCY_MAX_MS, LATENCY_MIN_MS, validateLatency } from '@/lib/latency'
+import { saveErrorMessage } from '@/lib/storageConnection'
 
 function timeSince(ts: number): string {
   const secs = Math.floor((Date.now() - ts) / 1000)
@@ -173,9 +175,18 @@ export function SourcesPanel() {
   const [newManualPort, setNewManualPort] = useState('')
   const [newPassphrase, setNewPassphrase] = useState('')
   const [newLatency, setNewLatency] = useState('')
+  // Audio stream for a new MPEG-TS/SRT source (studio#244). Manual entry only:
+  // there is no source id yet, so no discovery call.
+  const [newAudioStreamIndex, setNewAudioStreamIndex] = useState('0')
+  const [newAudioStreamError, setNewAudioStreamError] = useState<string | null>(null)
   const [newClipRef, setNewClipRef] = useState<ClipRefState>({ ...emptyClipRef })
   const [addAddressError, setAddAddressError] = useState<string | null>(null)
   const [editAddressError, setEditAddressError] = useState<string | null>(null)
+  // Latency range errors (studio#242) and a failed Edit Source PATCH, shown
+  // inline so the dialog stays open instead of a generic "Validation error".
+  const [addLatencyError, setAddLatencyError] = useState<string | null>(null)
+  const [editLatencyError, setEditLatencyError] = useState<string | null>(null)
+  const [editSaveError, setEditSaveError] = useState<string | null>(null)
   // Audio-stream discovery for the open MPEG-TS/SRT edit dialog (ADR-006, OL-45).
   // `null` = loading; `'error'` = request failed (treated like unavailable).
   const [audioStreams, setAudioStreams] = useState<AudioStreamsResponse | 'error' | null>(null)
@@ -228,8 +239,11 @@ export function SourcesPanel() {
     setNewManualPort('')
     setNewPassphrase('')
     setNewLatency('')
+    setNewAudioStreamIndex('0')
+    setNewAudioStreamError(null)
     setNewClipRef({ ...emptyClipRef })
     setAddAddressError(null)
+    setAddLatencyError(null)
     setNewAuthEnabled(false)
     setNewAuthHeaderName(DEFAULT_HEADER_NAME)
     setNewAuthHeaderValue('')
@@ -272,6 +286,10 @@ export function SourcesPanel() {
     }
     const addrErr = validateAddress(newAddress, newStreamType, newDirection)
     if (addrErr) { setAddAddressError(addrErr); return }
+    const latency = validateLatency(newLatency)
+    if (STREAM_TYPE_HAS_LATENCY[newStreamType] && !latency.ok) { setAddLatencyError(latency.message); return }
+    const audio = newSourceAudioStreamIndex(newStreamType, newAudioStreamIndex)
+    if (!audio.ok) { setNewAudioStreamError(audio.error); return }
     let address = newAddress.trim()
     if (newIsListener) {
       const port = listenerPortFor(portMode, newManualPort)
@@ -286,7 +304,8 @@ export function SourcesPanel() {
       streamType: newStreamType,
       status: 'inactive',
       color: '#27272a',
-      ...(STREAM_TYPE_HAS_LATENCY[newStreamType] ? { latency: parseInt(newLatency, 10) || 125 } : {}),
+      ...(STREAM_TYPE_HAS_LATENCY[newStreamType] && latency.ok ? { latency: latency.value ?? LATENCY_DEFAULT_MS } : {}),
+      ...audio.body,
     })
     if (newStreamType === 'html' && newAuthEnabled && newAuthHeaderValue.trim()) {
       // Create-then-PATCH (issue's suggested approach): the source needs an id
@@ -329,8 +348,34 @@ export function SourcesPanel() {
       authHasStoredValue: storedValueSet,
     })
     setEditAddressError(null)
+    setEditLatencyError(null)
+    setEditSaveError(null)
     setAuthError(null)
     setAuthBusy(false)
+  }
+
+  function closeEdit() {
+    setEditTarget(null)
+    setEditAddressError(null)
+    setEditLatencyError(null)
+    setEditSaveError(null)
+  }
+
+  /**
+   * PATCH the edited source and close the dialog only on success; a rejected
+   * save keeps it open with the backend's reason inline (studio#242). `quiet`
+   * stops the same failure also appearing as the global toast.
+   */
+  async function saveEdit(id: string, fields: Parameters<typeof updateSource>[1]): Promise<void> {
+    setEditSaveError(null)
+    try {
+      await updateSource(id, fields, { quiet: true })
+    } catch (err) {
+      setEditSaveError(saveErrorMessage(err))
+      return
+    }
+    setAuthError(null)
+    closeEdit()
   }
 
   // Discover audio streams when the edit dialog opens for an MPEG-TS/SRT source.
@@ -352,18 +397,16 @@ export function SourcesPanel() {
   const editIsListener = !!editTarget && isSrt(editTarget.streamType) && editTarget.direction === 'listener'
   const editReady = !!editTarget && !!editTarget.name.trim() && (!editIsListener || listenerReady(portMode, editTarget.manualPort, editTarget.port))
 
-  function handleEdit() {
+  async function handleEdit() {
     if (!editTarget || !editReady) return
     if (editTarget.streamType === 'clip') {
       const refErr = validateClipRef(editTarget.clipRef)
       if (refErr) { setEditAddressError(refErr); return }
       const serialized = serializeClipRef(editTarget.clipRef)
-      void updateSource(editTarget.id, {
+      await saveEdit(editTarget.id, {
         name: editTarget.name.trim(),
         ...(serialized !== editTarget.stored ? { address: serialized } : {}),
       })
-      setEditAddressError(null)
-      setEditTarget(null)
       return
     }
     // HTML auth (studio#154): the "Interactive (Popup)" checkbox has no backend
@@ -392,6 +435,9 @@ export function SourcesPanel() {
 
     const addrErr = validateAddress(editTarget.address, editTarget.streamType, editTarget.direction)
     if (addrErr) { setEditAddressError(addrErr); return }
+    // An empty field leaves the stored latency unchanged (no `latency` key).
+    const latency = validateLatency(editTarget.latency)
+    if (STREAM_TYPE_HAS_LATENCY[editTarget.streamType] && !latency.ok) { setEditLatencyError(latency.message); return }
     let address: string | undefined
     if (editIsListener) {
       const switched = srtDirection(editTarget.stored) !== 'listener'
@@ -409,16 +455,13 @@ export function SourcesPanel() {
       }
       if (address === editTarget.stored) address = undefined
     }
-    void updateSource(editTarget.id, {
+    await saveEdit(editTarget.id, {
       name: editTarget.name.trim(),
       ...(address !== undefined ? { address } : {}),
-      ...(STREAM_TYPE_HAS_LATENCY[editTarget.streamType] ? { latency: parseInt(editTarget.latency, 10) || 125 } : {}),
+      ...(STREAM_TYPE_HAS_LATENCY[editTarget.streamType] && latency.ok && latency.value !== undefined ? { latency: latency.value } : {}),
       ...audioStreamIndexPatch(editTarget.streamType, editTarget.audioStreamIndex, editTarget.initialAudioStreamIndex),
       ...(authPayload ? { auth: authPayload } : {}),
     })
-    setEditAddressError(null)
-    setAuthError(null)
-    setEditTarget(null)
   }
 
   /**
@@ -656,7 +699,7 @@ export function SourcesPanel() {
 
       {/* Edit modal */}
       {editTarget && (
-        <Modal open title="Edit Source" onClose={() => { setEditTarget(null); setEditAddressError(null) }}>
+        <Modal open title="Edit Source" onClose={closeEdit}>
           <div className="flex flex-col gap-3">
             <div>
               <label className={labelCls}>Name</label>
@@ -817,15 +860,20 @@ export function SourcesPanel() {
             )}
             {STREAM_TYPE_HAS_LATENCY[editTarget.streamType] && (
               <div>
-                <label className={labelCls}>Latency (ms)</label>
+                <label className={labelCls} htmlFor="edit-latency">
+                  Latency <span className="normal-case opacity-60">(ms, {LATENCY_MIN_MS}-{LATENCY_MAX_MS}, default {LATENCY_DEFAULT_MS})</span>
+                </label>
                 <input
+                  id="edit-latency"
                   type="number"
-                  min={0}
+                  min={LATENCY_MIN_MS}
+                  max={LATENCY_MAX_MS}
                   value={editTarget.latency}
-                  placeholder="125"
-                  onChange={(e) => setEditTarget({ ...editTarget, latency: e.target.value })}
+                  placeholder={String(LATENCY_DEFAULT_MS)}
+                  onChange={(e) => { setEditTarget({ ...editTarget, latency: e.target.value }); setEditLatencyError(null) }}
                   className={inputCls}
                 />
+                {editLatencyError && <p className="text-xs text-red-400 mt-1">{editLatencyError}</p>}
               </div>
             )}
             {editTarget.streamType === 'efp' && (
@@ -881,9 +929,10 @@ export function SourcesPanel() {
                 )}
               </div>
             )}
+            {editSaveError && <p role="alert" className="text-xs text-red-400">{editSaveError}</p>}
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={() => { setEditTarget(null); setEditAddressError(null) }}>Cancel</Button>
-              <Button variant="active" onClick={handleEdit} disabled={!editReady}>Save</Button>
+              <Button variant="ghost" onClick={closeEdit}>Cancel</Button>
+              <Button variant="active" onClick={() => { void handleEdit() }} disabled={!editReady}>Save</Button>
             </div>
           </div>
         </Modal>
@@ -923,6 +972,8 @@ export function SourcesPanel() {
                     setNewAddress('')
                     setNewClipRef({ ...emptyClipRef })
                     setAddAddressError(null)
+                    setNewAudioStreamIndex('0')
+                    setNewAudioStreamError(null)
                     setNewAuthEnabled(false)
                     setNewAuthHeaderName(DEFAULT_HEADER_NAME)
                     setNewAuthHeaderValue('')
@@ -1025,18 +1076,38 @@ export function SourcesPanel() {
           )}
           {STREAM_TYPE_HAS_LATENCY[newStreamType] && (
             <div>
-              <label className={labelCls}>
-                Latency <span className="normal-case opacity-60">(ms, default 125)</span>
+              <label className={labelCls} htmlFor="new-latency">
+                Latency <span className="normal-case opacity-60">(ms, {LATENCY_MIN_MS}-{LATENCY_MAX_MS}, default {LATENCY_DEFAULT_MS})</span>
               </label>
               <input
+                id="new-latency"
                 type="number"
-                min={20}
-                max={8000}
+                min={LATENCY_MIN_MS}
+                max={LATENCY_MAX_MS}
                 value={newLatency}
-                placeholder="125"
-                onChange={(e) => setNewLatency(e.target.value)}
+                placeholder={String(LATENCY_DEFAULT_MS)}
+                onChange={(e) => { setNewLatency(e.target.value); setAddLatencyError(null) }}
                 className={inputCls}
               />
+              {addLatencyError && <p className="text-xs text-red-400 mt-1">{addLatencyError}</p>}
+            </div>
+          )}
+          {supportsAudioStreamSelection(newStreamType) && (
+            <div>
+              <label className={labelCls} htmlFor="new-audio-stream">Audio stream</label>
+              <input
+                id="new-audio-stream"
+                type="number"
+                min={0}
+                step={1}
+                value={newAudioStreamIndex}
+                onChange={(e) => { setNewAudioStreamIndex(e.target.value); setNewAudioStreamError(null) }}
+                className={inputCls}
+              />
+              {newAudioStreamError && <p className="text-xs text-red-400 mt-1">{newAudioStreamError}</p>}
+              <p className="mt-1 text-xs text-[--color-text-muted] opacity-70">
+                Enter the 0-based audio stream index. The stream list is available in Edit Source once the source is live. Takes effect on the next production activation.
+              </p>
             </div>
           )}
         </div>
